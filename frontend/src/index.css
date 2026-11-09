@@ -1,0 +1,6 @@
+/* Tailwind CSS custom utilities */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+}
