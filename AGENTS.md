@@ -128,3 +128,4 @@ The Gemini system prompts are specialized per video format to follow 2026 YouTub
 - **Backend**: FastAPI + Uvicorn with clean async route handlers.
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS pre-compiled into static assets.
 - **Version Control**: Completely isolated inside `D:\AI_video_generation\GoogleSheet_UI_auditor/.git`.
+

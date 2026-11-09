@@ -12,10 +12,15 @@ backend_dir = Path(__file__).resolve().parent.parent / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+# pyrefly: ignore[missing-import]
 from fastapi.testclient import TestClient
+# pyrefly: ignore[missing-import]
 from app.core.routing import parse_and_route_id, IdRoutingError
+# pyrefly: ignore[missing-import]
 from app.services.prompt_service import PromptService
+# pyrefly: ignore[missing-import]
 from app.services.sheet_service import SheetService, ScriptNotFoundError
+# pyrefly: ignore[missing-import]
 from main import app
 
 
@@ -138,6 +143,7 @@ class TestFastApiEndpoints(unittest.TestCase):
 
     @patch.object(SheetService, "fetch_script_by_id")
     def test_get_script_endpoint_success(self, mock_fetch):
+        # pyrefly: ignore[missing-import]
         from app.models.schemas import ScriptRecord
         mock_fetch.return_value = ScriptRecord(
             ID="EE01",
@@ -165,3 +171,4 @@ class TestFastApiEndpoints(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

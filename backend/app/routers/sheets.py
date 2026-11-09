@@ -5,6 +5,7 @@ sheets.py — REST API Router for Google Sheets script operations
 from __future__ import annotations
 
 import logging
+# pyrefly: ignore[missing-import]
 from fastapi import APIRouter, HTTPException, Path
 
 from ..models.schemas import (
@@ -102,3 +103,4 @@ def update_description(
     except Exception as e:
         logger.exception(f"Unexpected error updating description {script_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+

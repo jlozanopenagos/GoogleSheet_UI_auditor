@@ -107,14 +107,27 @@ class SheetService:
         payload = {
             "action": "update_script",
             "spreadsheet_id": parsed.spreadsheet_id,
+            "gid": parsed.gid,
             "script_id": parsed.canonical_id,
             "SCRIPT_CHANGED": script_changed,
             "script_ready": script_ready,
             "script_date": script_date
         }
 
-        logger.info(f"Updating script fields for {parsed.canonical_id} in {parsed.spreadsheet_id}")
-        return self._http_post(self.master_url, payload)
+        logger.info(f"Updating script fields for {parsed.canonical_id} in {parsed.spreadsheet_id} (gid={parsed.gid})")
+        res = self._http_post(self.master_url, payload)
+
+        # Validate that the Apps Script actually executed an update
+        if res.get("status") == "error":
+            raise SheetServiceError(f"Google Sheet error: {res.get('message', 'Unknown error')}")
+
+        if res.get("message") == "Data processed successfully" and res.get("count") == 0:
+            raise SheetServiceError(
+                "Google Sheet returned 'count: 0'. The Google Apps Script deployed in your Google Sheet is still running the old placeholder code! "
+                "Please deploy the updated Code.gs in Google Sheets (Extensions > Apps Script > Deploy > New version)."
+            )
+
+        return res
 
     def update_description_field(
         self,
@@ -129,12 +142,24 @@ class SheetService:
         payload = {
             "action": "update_description",
             "spreadsheet_id": parsed.spreadsheet_id,
+            "gid": parsed.gid,
             "script_id": parsed.canonical_id,
             "short_description": short_description
         }
 
-        logger.info(f"Updating description for {parsed.canonical_id} in {parsed.spreadsheet_id}")
-        return self._http_post(self.master_url, payload)
+        logger.info(f"Updating description for {parsed.canonical_id} in {parsed.spreadsheet_id} (gid={parsed.gid})")
+        res = self._http_post(self.master_url, payload)
+
+        if res.get("status") == "error":
+            raise SheetServiceError(f"Google Sheet error: {res.get('message', 'Unknown error')}")
+
+        if res.get("message") == "Data processed successfully" and res.get("count") == 0:
+            raise SheetServiceError(
+                "Google Sheet returned 'count: 0'. The Google Apps Script deployed in your Google Sheet is still running the old placeholder code! "
+                "Please deploy the updated Code.gs in Google Sheets (Extensions > Apps Script > Deploy > New version)."
+            )
+
+        return res
 
     def _http_get(self, url: str) -> Dict[str, Any]:
         last_error = None
@@ -181,3 +206,4 @@ class SheetService:
 
 # Shared singleton instance
 sheet_service = SheetService()
+

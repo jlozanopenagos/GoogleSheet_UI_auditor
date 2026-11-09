@@ -48,3 +48,4 @@ export interface ApiResponse<T = any> {
 }
 
 export type ActiveTab = 'script_auditor' | 'description_creation';
+

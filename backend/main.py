@@ -6,9 +6,13 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+# pyrefly: ignore[missing-import]
 from fastapi import FastAPI
+# pyrefly: ignore[missing-import]
 from fastapi.middleware.cors import CORSMiddleware
+# pyrefly: ignore[missing-import]
 from fastapi.staticfiles import StaticFiles
+# pyrefly: ignore[missing-import]
 from fastapi.responses import FileResponse
 
 from app.core.config import settings
@@ -62,5 +66,7 @@ if static_dir.exists():
 
 
 if __name__ == "__main__":
+    # pyrefly: ignore[missing-import]
     import uvicorn
     uvicorn.run("main:app", host=settings.host, port=settings.port, reload=True)
+

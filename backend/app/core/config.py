@@ -8,7 +8,9 @@ import os
 import re
 from pathlib import Path
 from typing import Dict, Tuple, Optional
+# pyrefly: ignore[missing-import]
 from pydantic import BaseModel
+# pyrefly: ignore[missing-import]
 from dotenv import load_dotenv
 
 # Load .env file from project root or parent
@@ -75,3 +77,4 @@ def extract_gid(url: str) -> Optional[str]:
         return None
     match = re.search(r"[#&?]gid=([0-9]+)", url)
     return match.group(1) if match else None
+

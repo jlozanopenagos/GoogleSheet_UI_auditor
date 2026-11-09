@@ -157,3 +157,4 @@ class GeminiService:
 
 # Shared singleton instance
 gemini_service = GeminiService()
+

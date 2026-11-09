@@ -5,6 +5,7 @@ gemini.py — REST API Router for Gemini YouTube Shorts SEO Description generati
 from __future__ import annotations
 
 import logging
+# pyrefly: ignore[missing-import]
 from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import (
@@ -40,3 +41,4 @@ def generate_description(payload: GeminiGenerateRequest) -> ApiResponse:
     except Exception as e:
         logger.exception(f"Unexpected error in Gemini generation: {e}")
         raise HTTPException(status_code=500, detail=f"Gemini API failure: {e}")
+

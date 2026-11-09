@@ -65,3 +65,4 @@ export async function generateGeminiDescription(payload: GeminiGeneratePayload):
 
   return json.data;
 }
+

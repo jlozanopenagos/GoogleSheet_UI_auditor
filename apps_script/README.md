@@ -31,3 +31,4 @@ This directory contains the enhanced `Code.gs` script for Google Apps Script Web
    - **Who has access**: `Anyone`
 9. Click **Deploy**.
 10. If the Web App URL changed, update `SHEETS_MASTER_WEBAPP_URL` in `.env`. If you used "Manage deployments > New version", the URL stays exactly the same!
+

@@ -332,3 +332,4 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
     </div>
   );
 };
+

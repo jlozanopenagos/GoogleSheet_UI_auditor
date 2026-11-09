@@ -4,35 +4,28 @@
  * ==============================================================================
  * 
  * Capabilities:
- * 1. doGet: Reads columns A through I (?id=<SPREADSHEET_ID>&sheet=<TAB_NAME>)
+ * 1. doGet: Reads columns A through I (?id=<SPREADSHEET_ID>&gid=<TAB_GID>)
  *    - Automatically detects columns: ID, expression, script, SCRIPT_CHANGED,
  *      script_ready, script_date, video_ready, video_date, and short_description (Column I).
  *    - Guarantees Column I ("short_description") is present and mapped.
- *    - Formats dates as DD/MM/YY (e.g. "31/01/26") or ISO format.
+ *    - Formats dates as DD/MM/YY (e.g. "31/01/26").
  * 
- * 2. doPost: High-precision in-place updates by ID:
+ * 2. doPost: In-place row updates by ID:
  *    - action: "update_script": Updates Column D (SCRIPT_CHANGED), Column E (script_ready),
  *      and Column F (script_date) for the matching ID in place.
- *    - action: "update_description": Updates Column I (short_description) for the matching ID in place.
- *    - action: "batch_update": Standard bulk update supporting rows array.
+ *    - action: "update_description": Updates Column I (short_description) in place.
+ *    - Automatically resolves tabs by gid or tab name.
  * 
- * Setup Instructions:
- * 1. Open your Google Sheet(s).
- * 2. Click: Extensions > Apps Script.
- * 3. Replace all code in Code.gs with this entire file.
- * 4. Click 'Save' (💾).
- * 5. Click 'Deploy' > 'Manage deployments' > Click pencil (Edit) > 'Version' > 'New version'.
- * 6. Click 'Deploy' (Execute as: 'Me', Who has access: 'Anyone').
  * ==============================================================================
  */
 
 function doGet(e) {
   try {
-    const params = (e && e.parameter) ? e.parameter : {};
+    var params = (e && e.parameter) ? e.parameter : {};
 
-    // 1. Resolve spreadsheet by ID or fallback to active spreadsheet
-    const targetId = params.id || params.spreadsheet_id || params.sheet_id;
-    let ss;
+    // 1. Resolve spreadsheet by ID
+    var targetId = params.id || params.spreadsheet_id || params.sheet_id;
+    var ss;
     if (targetId && String(targetId).trim()) {
       ss = SpreadsheetApp.openById(String(targetId).trim());
     } else {
@@ -43,27 +36,17 @@ function doGet(e) {
       return createJsonResponse({ status: "error", message: "Spreadsheet not found" }, 404);
     }
 
-    // 2. Resolve sheet tab
-    const tabName = params.sheet || params.tab;
-    let sheet;
-    if (tabName && String(tabName).trim()) {
-      sheet = ss.getSheetByName(String(tabName).trim());
-      if (!sheet) {
-        return createJsonResponse({
-          status: "error",
-          message: "Sheet tab '" + tabName + "' not found in spreadsheet: " + ss.getName()
-        }, 404);
-      }
-    } else {
-      sheet = ss.getActiveSheet() || ss.getSheets()[0];
+    // 2. Resolve sheet tab by gid or name
+    var sheet = resolveSheetTab(ss, params);
+    if (!sheet) {
+      return createJsonResponse({ status: "error", message: "Sheet tab not found" }, 404);
     }
 
     // 3. Ensure Column I header exists
     ensureColumnIHeader(sheet);
 
     // 4. Read sheet data
-    const dataRange = sheet.getDataRange();
-    const data = dataRange.getValues();
+    var data = sheet.getDataRange().getValues();
     if (!data || data.length < 2) {
       return createJsonResponse({
         status: "success",
@@ -75,10 +58,7 @@ function doGet(e) {
     }
 
     // 5. Header row (Row 1)
-    const rawHeaders = data[0];
-    const headers = rawHeaders.map(function(h) { return String(h || "").trim(); });
-
-    // Locate target columns case-insensitively
+    var headers = data[0].map(function(h) { return String(h || "").trim(); });
     var colMap = resolveColumnIndexes(headers);
 
     // 6. Map rows to structured JSON records
@@ -86,7 +66,7 @@ function doGet(e) {
     for (var r = 1; r < data.length; r++) {
       var row = data[r];
       var idVal = String(row[colMap.id] || "").trim();
-      if (!idVal) continue; // Skip blank rows
+      if (!idVal) continue;
 
       var record = {
         ID: idVal,
@@ -143,19 +123,13 @@ function doPost(e) {
       return createJsonResponse({ status: "error", message: "Spreadsheet not found" }, 404);
     }
 
-    // 2. Resolve sheet tab
-    var tabName = payload.tab || payload.sheet || (e && e.parameter ? (e.parameter.sheet || e.parameter.tab) : null);
-    var sheet;
-    if (tabName && String(tabName).trim()) {
-      sheet = ss.getSheetByName(String(tabName).trim());
-      if (!sheet) {
-        return createJsonResponse({ status: "error", message: "Sheet tab '" + tabName + "' not found" }, 404);
-      }
-    } else {
-      sheet = ss.getActiveSheet() || ss.getSheets()[0];
+    // 2. Resolve sheet tab by gid or name
+    var sheet = resolveSheetTab(ss, payload, e && e.parameter ? e.parameter : null);
+    if (!sheet) {
+      return createJsonResponse({ status: "error", message: "Sheet tab not found" }, 404);
     }
 
-    // Ensure Column I header exists
+    // 3. Ensure Column I header exists
     ensureColumnIHeader(sheet);
 
     var action = payload.action || "update_script";
@@ -166,13 +140,12 @@ function doPost(e) {
     } else if (action === "update_description") {
       actionResult = handleUpdateDescription(sheet, payload);
     } else {
-      // General batch row update/append
       actionResult = handleBatchUpdate(sheet, payload);
     }
 
-    // Flush pending writes
+    // Flush pending changes to ensure immediate persistence
     SpreadsheetApp.flush();
-    Utilities.sleep(200);
+    Utilities.sleep(250);
 
     return createJsonResponse(actionResult);
 
@@ -182,104 +155,159 @@ function doPost(e) {
 }
 
 /**
+ * Resolves the sheet tab by gid, tab/sheet name, or active/first sheet.
+ */
+function resolveSheetTab(ss, params1, params2) {
+  var p = params1 || {};
+  var p2 = params2 || {};
+  var targetGid = p.gid || p2.gid;
+  var tabName = p.sheet || p.tab || p2.sheet || p2.tab;
+
+  // Search by GID first if present
+  if (targetGid !== undefined && targetGid !== null && String(targetGid).trim() !== "") {
+    var allSheets = ss.getSheets();
+    for (var s = 0; s < allSheets.length; s++) {
+      if (String(allSheets[s].getSheetId()) === String(targetGid).trim()) {
+        return allSheets[s];
+      }
+    }
+  }
+
+  // Search by Tab Name
+  if (tabName && String(tabName).trim()) {
+    var namedSheet = ss.getSheetByName(String(tabName).trim());
+    if (namedSheet) return namedSheet;
+  }
+
+  // Fallback to active or first sheet
+  return ss.getActiveSheet() || ss.getSheets()[0];
+}
+
+/**
  * Updates Column D (SCRIPT_CHANGED), Column E (script_ready), and Column F (script_date)
- * for a single row identified by ID.
+ * in place for a single row identified by ID.
  */
 function handleUpdateScript(sheet, payload) {
   var targetId = String(payload.script_id || payload.ID || payload.id || "").trim();
   if (!targetId) {
-    return { status: "error", message: "Missing target ID" };
+    return { status: "error", message: "Missing target ID in request payload" };
   }
 
   var data = sheet.getDataRange().getValues();
   if (!data || data.length < 2) {
-    return { status: "error", message: "Sheet has no data rows" };
+    return { status: "error", message: "Sheet contains no data rows" };
   }
 
   var headers = data[0].map(function(h) { return String(h || "").trim(); });
   var colMap = resolveColumnIndexes(headers);
 
+  var targetIdUpper = targetId.toUpperCase();
   var rowIndex = -1;
+
   for (var r = 1; r < data.length; r++) {
-    if (String(data[r][colMap.id] || "").trim() === targetId) {
-      rowIndex = r + 1; // 1-based row in sheet
+    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
+    if (cellId === targetIdUpper) {
+      rowIndex = r + 1; // 1-based index in Google Sheets
       break;
     }
   }
 
   if (rowIndex === -1) {
-    return { status: "error", message: "ID '" + targetId + "' not found in sheet" };
+    return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
   }
 
-  // Update Column D (SCRIPT_CHANGED)
+  var updatedFields = [];
+
+  // 1. Update Column D: SCRIPT_CHANGED
   if (payload.SCRIPT_CHANGED !== undefined || payload.script_changed !== undefined || payload.new_script !== undefined) {
-    var newScript = String(payload.SCRIPT_CHANGED !== undefined ? payload.SCRIPT_CHANGED : (payload.script_changed !== undefined ? payload.script_changed : payload.new_script));
+    var newScript = String(
+      payload.SCRIPT_CHANGED !== undefined ? payload.SCRIPT_CHANGED :
+      (payload.script_changed !== undefined ? payload.script_changed : payload.new_script)
+    );
     sheet.getRange(rowIndex, colMap.script_changed + 1).setValue(newScript);
+    updatedFields.push("SCRIPT_CHANGED");
   }
 
-  // Update Column E (script_ready)
+  // 2. Update Column E: script_ready (Boolean Checkbox)
   if (payload.script_ready !== undefined) {
-    var isReady = Boolean(payload.script_ready === true || payload.script_ready === "true" || payload.script_ready === 1 || payload.script_ready === "1");
+    var isReady = Boolean(
+      payload.script_ready === true ||
+      payload.script_ready === "true" ||
+      payload.script_ready === 1 ||
+      payload.script_ready === "1"
+    );
     sheet.getRange(rowIndex, colMap.script_ready + 1).setValue(isReady);
+    updatedFields.push("script_ready");
   }
 
-  // Update Column F (script_date)
+  // 3. Update Column F: script_date
   if (payload.script_date !== undefined) {
     var scriptDate = String(payload.script_date || "").trim();
     sheet.getRange(rowIndex, colMap.script_date + 1).setValue(scriptDate);
+    updatedFields.push("script_date");
   }
 
   return {
     status: "success",
-    message: "Script updated successfully for ID " + targetId,
+    message: "Row " + rowIndex + " updated successfully for ID " + targetId,
     id: targetId,
-    row_number: rowIndex
+    sheet_name: sheet.getName(),
+    row_number: rowIndex,
+    updated_fields: updatedFields
   };
 }
 
 /**
- * Updates Column I (short_description) for a single row identified by ID.
+ * Updates Column I (short_description) in place for a single row identified by ID.
  */
 function handleUpdateDescription(sheet, payload) {
   var targetId = String(payload.script_id || payload.ID || payload.id || "").trim();
   if (!targetId) {
-    return { status: "error", message: "Missing target ID" };
+    return { status: "error", message: "Missing target ID in request payload" };
   }
 
   var data = sheet.getDataRange().getValues();
   if (!data || data.length < 2) {
-    return { status: "error", message: "Sheet has no data rows" };
+    return { status: "error", message: "Sheet contains no data rows" };
   }
 
   var headers = data[0].map(function(h) { return String(h || "").trim(); });
   var colMap = resolveColumnIndexes(headers);
 
+  var targetIdUpper = targetId.toUpperCase();
   var rowIndex = -1;
+
   for (var r = 1; r < data.length; r++) {
-    if (String(data[r][colMap.id] || "").trim() === targetId) {
+    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
+    if (cellId === targetIdUpper) {
       rowIndex = r + 1;
       break;
     }
   }
 
   if (rowIndex === -1) {
-    return { status: "error", message: "ID '" + targetId + "' not found in sheet" };
+    return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
   }
 
-  var description = String(payload.short_description !== undefined ? payload.short_description : (payload.description || "")).trim();
+  var description = String(
+    payload.short_description !== undefined ? payload.short_description :
+    (payload.description !== undefined ? payload.description : "")
+  ).trim();
+
   sheet.getRange(rowIndex, colMap.short_description + 1).setValue(description);
 
   return {
     status: "success",
     message: "Description updated successfully for ID " + targetId,
     id: targetId,
+    sheet_name: sheet.getName(),
     row_number: rowIndex,
     short_description: description
   };
 }
 
 /**
- * Legacy/Bulk batch updater for backward compatibility.
+ * Bulk row update handler for backward compatibility.
  */
 function handleBatchUpdate(sheet, payload) {
   var rows = Array.isArray(payload.rows) ? payload.rows : [];
@@ -293,14 +321,14 @@ function handleBatchUpdate(sheet, payload) {
 
   var idToRowMap = {};
   for (var r = 1; r < data.length; r++) {
-    var idVal = String(data[r][colMap.id] || "").trim();
+    var idVal = String(data[r][colMap.id] || "").trim().toUpperCase();
     if (idVal) idToRowMap[idVal] = r + 1;
   }
 
   var updatedCount = 0;
   for (var i = 0; i < rows.length; i++) {
     var item = rows[i];
-    var rowId = String(item.ID || item.id || "").trim();
+    var rowId = String(item.ID || item.id || "").trim().toUpperCase();
     if (!rowId || !idToRowMap[rowId]) continue;
 
     var targetRow = idToRowMap[rowId];
@@ -354,7 +382,6 @@ function ensureColumnIHeader(sheet) {
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
   var headers = headerRange.getValues()[0];
 
-  // If Column I (col 9) has no header, set it to "short_description"
   if (!headers[8] || String(headers[8]).trim() === "") {
     sheet.getRange(1, 9).setValue("short_description");
   }
@@ -372,7 +399,6 @@ function formatCellDate(val) {
     return day + "/" + month + "/" + year;
   }
   var s = String(val).trim();
-  // If already in DD/MM/YY or DD/MM/YYYY, normalize to DD/MM/YY
   var match = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
   if (match) {
     var d = ("0" + match[1]).slice(-2);

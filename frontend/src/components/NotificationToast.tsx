@@ -37,3 +37,4 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ type, mess
     </div>
   );
 };
+

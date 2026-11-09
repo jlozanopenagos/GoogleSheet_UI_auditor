@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 from typing import Dict, Tuple, Optional
+# pyrefly: ignore[missing-import]
 from pydantic import BaseModel
 from .config import ENDPOINT_REGISTRY, extract_spreadsheet_id, extract_gid
 
@@ -99,3 +100,4 @@ def parse_and_route_id(raw_id: str) -> ParsedId:
         gid=gid,
         sheet_url=endpoint_url
     )
+

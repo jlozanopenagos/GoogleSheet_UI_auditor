@@ -290,3 +290,4 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
     </div>
   );
 };
+

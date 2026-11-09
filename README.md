@@ -113,3 +113,4 @@ To ensure Google Sheets reads Column I (`short_description`), formats dates as `
 py tests/test_auditor.py
 ```
 Executes all unit tests covering ID routing, format-specific prompt synthesis, and API endpoints.
+

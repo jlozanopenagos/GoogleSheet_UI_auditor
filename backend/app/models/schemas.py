@@ -5,6 +5,7 @@ schemas.py — Typed Pydantic Schemas & Data Contracts for GoogleSheet_UI_audito
 from __future__ import annotations
 
 from typing import Optional, List, Any
+# pyrefly: ignore[missing-import]
 from pydantic import BaseModel, Field
 
 
@@ -55,3 +56,4 @@ class ApiResponse(BaseModel):
     message: str = ""
     data: Optional[Any] = None
     error: Optional[str] = None
+

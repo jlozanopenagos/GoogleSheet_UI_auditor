@@ -92,3 +92,4 @@ export const IdSearchBar: React.FC<IdSearchBarProps> = ({ onSearch, isLoading, a
     </div>
   );
 };
+

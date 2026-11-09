@@ -83,3 +83,4 @@ Official Video Script:
 \"\"\"
 
 Write the high-retention YouTube Shorts description following the system prompt rules. Output ONLY the description text with 3-5 hashtags at the end, zero emojis, zero spoilers."""
+
