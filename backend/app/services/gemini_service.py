@@ -73,7 +73,7 @@ class GeminiService:
             language=parsed.language
         )
 
-        # Call Gemini REST API
+        # Call Gemini REST API with higher temperature for creative diversity across runs
         endpoint = f"{self.base_url}/{self.model}:generateContent?key={self.api_key}"
         payload = {
             "system_instruction": {
@@ -86,8 +86,8 @@ class GeminiService:
                 }
             ],
             "generationConfig": {
-                "temperature": 0.4,
-                "maxOutputTokens": 300
+                "temperature": 0.75,
+                "maxOutputTokens": 500
             }
         }
 
@@ -137,7 +137,7 @@ class GeminiService:
         return parts[0].get("text", "")
 
     def _sanitize_description(self, text: str) -> str:
-        """Removes markdown code blocks, conversational prefixes, quotes, and emojis."""
+        """Removes markdown code blocks, conversational prefixes, and enclosing quotes while preserving tasteful emojis."""
         s = text.strip()
         # Remove markdown code fence ``` ... ```
         s = re.sub(r"^```[a-zA-Z]*\n?", "", s)
@@ -147,12 +147,11 @@ class GeminiService:
         # Strip enclosing double quotes if model wrapped everything in quotes
         if s.startswith('"') and s.endswith('"') and len(s) > 2:
             s = s[1:-1].strip()
-        # Strictly purge emojis
-        s = EMOJI_PATTERN.sub("", s)
-        # Clean extra spaces
-        s = re.sub(r"[ \t]+", " ", s)
-        s = re.sub(r"\n\s*\n", "\n", s).strip()
-        return s
+        # Clean extra spaces on individual lines but preserve paragraph linebreaks (\n\n)
+        lines = [re.sub(r"[ \t]+", " ", line).strip() for line in s.split("\n")]
+        # Normalize multiple blank lines to at most one double newline
+        cleaned = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+        return cleaned
 
 
 # Shared singleton instance

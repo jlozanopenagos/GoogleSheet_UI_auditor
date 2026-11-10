@@ -30,12 +30,17 @@ A standalone, high-performance web application designed for rapid auditing, edit
      - Shows two centered actions:
        1. **Create a new description**: Manual entry card with immediate save action.
        2. **Gemini creation**: Consumes Google Gemini AI to synthesize a viral, format-specific YouTube Shorts description.
-   - **Gemini SEO Invariants**:
+   - **Gemini SEO Invariants & 3-Beat Architecture**:
      - Specialized system prompts per format (`EXPRESSION`, `GAME`, `ROLEPLAY`, `FUN_FACTS`).
+     - **Rich 3-Beat Pacing (60–90 words, 350–500 characters)**:
+       * *Paragraph 1*: High-curiosity hook within the first 120–150 characters (above the fold).
+       * *Paragraph 2*: Narrative scenario/dilemma + mandatory retention driver (*"Watch until the end..."*).
+       * *Paragraph 3*: Active social engagement question (*"Drop your guess below! 👇"* or *"Tag them in the comments! 👇"*).
      - **100% Target Language Purity**: Body prose written purely in the target language (no mixed languages).
-     - **3 to 5 Targeted Hashtags**: Blends target language keywords with high-volume English discovery tags (`#Shorts`, `#LearnEnglish`, etc.).
-     - **Zero Spoilers**: Never gives away the quiz answer, twist, or meaning.
-     - **Zero Emojis & Zero Commentary**: Clean, pure description text.
+     - **3 to 5 Targeted Hashtags**: Blends target language keywords with high-volume discovery tags (`#Shorts`, `#LearnEnglish`, etc.).
+     - **Zero Spoilers**: Never reveals the quiz solution, punchline, or idiom translation.
+     - **Tasteful Emojis (1 to 3 MAX)**: Expressive emojis (e.g. `😬`, `👇`, `🤯`, `💬`) adding visual personality.
+     - **Dynamic Variation**: High-temperature sampling (0.75) and varied opening/middle/closing angles ensure repeated runs for the same script produce fresh, non-repetitive descriptions.
      - **Prerequisite Gate**: Requires Column D (`SCRIPT_CHANGED`) to be non-empty before calling Gemini.
 
 ---

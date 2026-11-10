@@ -105,20 +105,27 @@ When the user submits an ID into the search bar:
 
 ## 6. Gemini SEO Description Engine Rules
 
-The Gemini system prompts are specialized per video format to follow 2026 YouTube Shorts SEO best practices:
+The Gemini system prompts are specialized per video format to follow 2026 YouTube Shorts SEO and high-retention engagement best practices:
 
-1. **Format-Specific Psychological Angles**:
-   - **`EXPRESSION`**: Highlights the hidden conversational meaning and the hilarious/awkward literal translation trap.
-   - **`GAME`**: Fast trivia / ear-test challenge. Urges viewers to pause or guess before time runs out.
-   - **`ROLEPLAY`**: Real-life situational tension. Focuses on interpersonal banter and awkward conflict resolution.
-   - **`FUN_FACTS`**: Mind-bending linguistic discovery. Uses "Wait, really?!" curiosity hooks.
-2. **Strict Output Invariants**:
-   - **Target Language Purity**: The description text MUST be 100% in the video's target language (English, French, Spanish, or Italian). No mixed languages in the prose.
-   - **No Spoilers**: NEVER reveal the answer to the quiz, the secret meaning, or the punchline in the description.
-   - **High-CTR Hook**: Front-load curiosity in the first 80–120 characters before the mobile `...more` fold.
-   - **Hashtags**: Exactly 3 to 5 relevant hashtags at the end, combining high-volume discovery tags (`#Shorts`, `#LearnSpanish`, etc.) and target language tags.
-   - **Zero Emojis & Zero Commentary**: Banned from outputting emojis, conversational prefixes ("Here is the description:"), markdown wrappers, or explanations.
-   - **Prerequisite Check**: If Column D (`SCRIPT_CHANGED`) is empty, generation is blocked with an explicit error.
+1. **Rich 3-Beat Narrative Architecture (60–90 words, 350–500 characters)**:
+   - **Paragraph 1 (The Hook)**: Punchy high-curiosity opening (provocative myth-buster, rhetorical question, or relatable blunder) placed within the first 120–150 characters before the mobile `...more` fold.
+   - **Paragraph 2 (The Stakes & Retention Driver)**: Expands the scenario, tension, or mystery without spoilers. MUST include an explicit viewer retention driver (e.g. *"Stick around until the end to discover..."*, *"Watch till the end to see the correct answer and learn..."*, *"Watch what happens next!"*).
+   - **Paragraph 3 (The Social Engagement CTA)**: A conversational call-to-action question urging viewers to comment, tag a friend, or drop a guess, ending with a pointer emoji (`👇` or `💬`).
+   - **Hashtags**: Exactly 3 to 5 targeted hashtags at the bottom (blending target language tags like `#ApprendreLeFrancais`, `#AprenderEspanol` with high-traffic global discovery tags like `#Shorts`, `#LearnEnglish`).
+
+2. **Format-Specific Psychological Angles**:
+   - **`EXPRESSION`**: Highlights the gap between literal textbook translation and true native conversational meaning. Good intentions triggering unexpected panic, laughter, or disaster.
+   - **`GAME`**: Fast trivia ear challenge / dilemma. Urges viewers to test their knowledge, challenge their ears, and guess before the reveal countdown.
+   - **`ROLEPLAY`**: Real-life conversational banter, awkward interpersonal tension, and dialogue misunderstandings between two characters.
+   - **`FUN_FACTS`**: The "Wait, really?!" phenomenon. Mind-bending linguistic etymologies, forgotten historical inventions (e.g. printing press), or bizarre linguistic fossils trapped in time.
+
+3. **Strict Output Invariants**:
+   - **Target Language Purity**: The prose description MUST be written 100% in the video's target language (English, French, Spanish, or Italian). No mixed languages in the prose.
+   - **Zero Spoilers (Absolute Rule)**: NEVER reveal the quiz answer, the secret native expression, the translation, or the punchline in the description!
+   - **Tasteful Emojis (1 to 3 MAX)**: Emojis are permitted and encouraged in moderation (e.g. `😬`, `👇`, `🤯`, `💬`, `🤔`, `👀`) to add visual personality without looking spammy.
+   - **Dynamic Variation Mandate**: Temperature is set to `0.75` with diverse opening/middle/closing strategies so that repeated generations for the same script produce fresh, varied descriptions rather than formulaic templates.
+   - **Prerequisite Check**: If Column D (`SCRIPT_CHANGED`) is empty, Gemini generation is blocked with an explicit error.
+   - **Zero Commentary**: Strictly forbidden from outputting conversational fluff ("Here is your description:"), markdown quotes, or explanations.
 
 ---
 

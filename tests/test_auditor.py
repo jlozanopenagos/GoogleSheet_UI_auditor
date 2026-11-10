@@ -66,8 +66,8 @@ class TestPromptService(unittest.TestCase):
         for fmt in formats:
             prompt = PromptService.build_system_prompt(fmt, "french")
             self.assertIn("TARGET LANGUAGE PURITY", prompt)
-            self.assertIn("NO SPOILERS", prompt)
-            self.assertIn("ZERO EMOJIS", prompt)
+            self.assertIn("ZERO SPOILERS", prompt)
+            self.assertIn("TASTEFUL EMOJIS", prompt)
             self.assertIn("French", prompt)
 
     def test_user_prompt_construction(self):
