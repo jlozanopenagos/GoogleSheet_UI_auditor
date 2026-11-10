@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Save, Loader2, Calendar, CheckSquare, FileText, Sparkles, ExternalLink } from 'lucide-react';
+import { Copy, Check, Save, Loader2, Calendar, FileText, Sparkles, ExternalLink } from 'lucide-react';
 import { ScriptRecord } from '../types';
-import { updateScriptFields } from '../services/api';
+import { updateScriptFields, doctorScriptWithGemini } from '../services/api';
 
 interface ScriptAuditorViewProps {
   script: ScriptRecord | null;
@@ -22,6 +22,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
   const [scriptReady, setScriptReady] = useState(false);
   const [scriptDate, setScriptDate] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDoctoring, setIsDoctoring] = useState(false);
 
   // Sync state when script changes
   useEffect(() => {
@@ -48,7 +49,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
 
   // Check if content has been modified by the user
   const hasScriptChanged = scriptChanged !== initialScriptChanged;
-  const isSaveEnabled = hasScriptChanged && !isUpdating;
+  const isSaveEnabled = hasScriptChanged && !isUpdating && !isDoctoring;
 
   // Placeholder text when Column D is empty
   const placeholderText = `you can edit here the new version of the script ${script.expression || script.ID}`;
@@ -61,6 +62,29 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       onError('Failed to copy text to clipboard.');
+    }
+  };
+
+  const handleDoctorScript = async () => {
+    if (!script.script || !script.script.trim()) {
+      onError('Cannot doctor script: Original script in Column C is empty.');
+      return;
+    }
+
+    setIsDoctoring(true);
+    try {
+      const res = await doctorScriptWithGemini({
+        script_id: script.ID,
+        expression: script.expression,
+        original_script: script.script,
+      });
+
+      setScriptChanged(res.doctored_script);
+      onSuccess(`Script doctored with Gemini (${res.word_count} words)! Click 'Send Update' to save to Google Sheets.`);
+    } catch (err: any) {
+      onError(err.message || 'Failed to doctor script with Gemini.');
+    } finally {
+      setIsDoctoring(false);
     }
   };
 
@@ -192,10 +216,23 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
             <textarea
               value={scriptChanged}
               onChange={(e) => setScriptChanged(e.target.value)}
-              disabled={isUpdating}
+              disabled={isUpdating || isDoctoring}
               placeholder={placeholderText}
-              className="w-full h-full min-h-[320px] p-4 bg-[#0b0f19] border border-gray-700/80 rounded-xl text-white text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 mono-font transition-all"
+              className="w-full h-full min-h-[320px] p-4 pr-12 bg-[#0b0f19] border border-gray-700/80 rounded-xl text-white text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 mono-font transition-all"
             />
+            {/* Gemini Script Doctor button in the top right corner */}
+            <button
+              onClick={handleDoctorScript}
+              disabled={isDoctoring || isUpdating || !script.script}
+              title="change the script with Gemini"
+              className="absolute top-3 right-3 p-2 bg-gradient-to-br from-purple-600/30 via-indigo-600/30 to-blue-600/30 hover:from-purple-600/60 hover:to-indigo-600/60 border border-purple-500/40 hover:border-purple-400/80 rounded-lg text-purple-200 hover:text-white shadow-lg backdrop-blur-sm transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed group z-10"
+            >
+              {isDoctoring ? (
+                <Loader2 className="w-4 h-4 animate-spin text-purple-300" />
+              ) : (
+                <Sparkles className="w-4 h-4 text-purple-300 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-200" />
+              )}
+            </button>
           </div>
 
           <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
@@ -272,6 +309,11 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
                   <span>Updating Google Sheet in place...</span>
+                </>
+              ) : isDoctoring ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-300" />
+                  <span>Doctoring script with Gemini...</span>
                 </>
               ) : (
                 <>

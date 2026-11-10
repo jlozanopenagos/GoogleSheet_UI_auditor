@@ -10,10 +10,12 @@ from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import (
     GeminiGenerateRequest,
+    DoctorScriptRequest,
     ApiResponse
 )
 from ..core.routing import IdRoutingError
 from ..services.gemini_service import gemini_service, GeminiServiceError
+from ..services.script_doctor_service import script_doctor_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/gemini", tags=["Gemini AI SEO"])
@@ -41,4 +43,27 @@ def generate_description(payload: GeminiGenerateRequest) -> ApiResponse:
     except Exception as e:
         logger.exception(f"Unexpected error in Gemini generation: {e}")
         raise HTTPException(status_code=500, detail=f"Gemini API failure: {e}")
+
+
+@router.post("/doctor-script", response_model=ApiResponse)
+def doctor_script(payload: DoctorScriptRequest) -> ApiResponse:
+    """Doctors and rewrites the original script completely using Gemini with audited system prompts."""
+    try:
+        result = script_doctor_service.doctor_script(
+            script_id=payload.script_id,
+            expression=payload.expression,
+            original_script=payload.original_script
+        )
+        return ApiResponse(
+            success=True,
+            message="Script doctored successfully with Gemini.",
+            data=result
+        )
+    except IdRoutingError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Unexpected error doctoring script: {e}")
+        raise HTTPException(status_code=500, detail=f"Script Doctoring failure: {e}")
 

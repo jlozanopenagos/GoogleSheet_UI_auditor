@@ -82,6 +82,12 @@ When the user submits an ID into the search bar:
 - **Left Box (Read-Only)**: Content of Column C (`script`). Copying text is allowed; direct editing is locked.
 - **Right Box (Editable)**: Content of Column D (`SCRIPT_CHANGED`).
   - If empty: displays placeholder `"you can edit here the new version of the script {expression_name}"`.
+  - **Gemini Script Doctor**: Top-right corner button with Gemini/Sparkles icon and tooltip `"change the script with Gemini"`. Reads Column C and doctors it into a fresh, out-of-the-box script adhering strictly to format rules and word budgets:
+    - `EXPRESSION`: 85–110 words, 5-paragraph progression (Hook, Setup, Discovery, Example, Payoff).
+    - `ROLEPLAY`: 145–180 words, 6-block peer dialogue (Narrator Hook, 4 dialogue exchanges with emotional tags, Narrator Payoff). Banned tutor tropes and bets.
+    - `GAME`: 95–125 spoken words across 5 sections (Hook, Challenge, Pressure, Answer, Explanation) + chalkboard exercise. No spoken blanks (`___`), strict option syntax (`A: `, `B: ` with period), zero connectors (`or`, `and`).
+    - `FUN_FACTS`: 95–135 words, 3–5 clean paragraphs (Hook, Historical/Phonetic mystery, Payoff). 100% factual integrity.
+  - Automatically loads the doctored result into Column D and activates the Save button.
 - **Under the Right Box**:
   - **Save Script Button**: Pushes updated `SCRIPT_CHANGED`, `script_ready`, and `script_date` to the sheet in place.
   - **Button State**: Disabled while an update is in flight. Once updated, displays a success notification and remains disabled until the user modifies the text again.

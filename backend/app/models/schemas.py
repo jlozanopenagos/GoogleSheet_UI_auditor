@@ -43,6 +43,12 @@ class GeminiGenerateRequest(BaseModel):
     script_changed: str = Field(..., description="Spoken script text from Column D (required)")
 
 
+class DoctorScriptRequest(BaseModel):
+    script_id: str = Field(..., description="Canonical ID (e.g. EF01)")
+    expression: str = Field(..., description="Target expression name (Column B)")
+    original_script: str = Field(..., description="Original draft script from Column C")
+
+
 class GeminiGenerateResponse(BaseModel):
     script_id: str
     short_description: str

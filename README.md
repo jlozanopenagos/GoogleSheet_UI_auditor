@@ -16,6 +16,10 @@ A standalone, high-performance web application designed for rapid auditing, edit
    - Header shows: `Editing X (ID): Y(expression_name)`.
    - **Left Column**: Read-only display of Column C (`script`) with a quick 1-click Copy button.
    - **Right Column**: Editable textbox for Column D (`SCRIPT_CHANGED`), defaulting to `"you can edit here the new version of the script {expression}"` if empty.
+   - **Gemini Script Doctor**:
+     - Star/Gemini icon button positioned in the top-right corner of the Column D text editor with hover tooltip `"change the script with Gemini"`.
+     - Automatically reads Column C (`script`), diagnoses the narrative, and doctors it completely into an authentic, creative, out-of-the-box script adhering strictly to format rules and word budgets.
+     - Rewritten script instantly populates Column D, enabling the Save button.
    - **Under-the-Box Controls**:
      - **Save Button**: Updates Column D, Column E, and Column F in place on Google Sheets. Disabled during transmission and remains deactivated until subsequent text modifications are made.
      - **Column E Checkbox (`script_ready`)**: Toggleable only when script content is edited.

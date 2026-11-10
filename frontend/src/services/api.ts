@@ -4,6 +4,8 @@ import {
   UpdateDescriptionPayload,
   GeminiGeneratePayload,
   GeminiGenerateResult,
+  DoctorScriptPayload,
+  DoctorScriptResult,
   ApiResponse,
 } from '../types';
 
@@ -61,6 +63,21 @@ export async function generateGeminiDescription(payload: GeminiGeneratePayload):
   const json: ApiResponse<GeminiGenerateResult> = await resp.json();
   if (!resp.ok || !json.success || !json.data) {
     throw new Error(json.message || json.error || 'Gemini generation failed.');
+  }
+
+  return json.data;
+}
+
+export async function doctorScriptWithGemini(payload: DoctorScriptPayload): Promise<DoctorScriptResult> {
+  const resp = await fetch(`${API_BASE}/gemini/doctor-script`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<DoctorScriptResult> = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.message || json.error || 'Gemini script doctoring failed.');
   }
 
   return json.data;

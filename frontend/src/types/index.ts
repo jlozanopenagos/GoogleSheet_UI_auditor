@@ -40,6 +40,19 @@ export interface GeminiGenerateResult {
   hashtags: string[];
 }
 
+export interface DoctorScriptPayload {
+  script_id: string;
+  expression: string;
+  original_script: string;
+}
+
+export interface DoctorScriptResult {
+  script_id: string;
+  expression: string;
+  doctored_script: string;
+  word_count: number;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;

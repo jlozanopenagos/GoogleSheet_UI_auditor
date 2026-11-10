@@ -20,6 +20,13 @@ from app.core.routing import parse_and_route_id, IdRoutingError
 from app.services.prompt_service import PromptService
 # pyrefly: ignore[missing-import]
 from app.services.sheet_service import SheetService, ScriptNotFoundError
+from app.services.script_doctor_service import (
+    ScriptDoctorService,
+    ROLEPLAY_SYSTEM_PROMPT,
+    GAME_SYSTEM_PROMPT,
+    FUN_FACTS_SYSTEM_PROMPT,
+    EXPRESSION_SYSTEM_PROMPT
+)
 # pyrefly: ignore[missing-import]
 from main import app
 
@@ -167,6 +174,58 @@ class TestFastApiEndpoints(unittest.TestCase):
     def test_get_script_invalid_id_format(self):
         resp = self.client.get("/api/sheets/script/INVALID_ID_999")
         self.assertEqual(resp.status_code, 400)
+
+    @patch("app.routers.gemini.script_doctor_service.doctor_script")
+    def test_doctor_script_endpoint_success(self, mock_doctor):
+        mock_doctor.return_value = {
+            "script_id": "EF01",
+            "expression": "Silent letters",
+            "doctored_script": "Ever wonder why silent letters exist in English? Centuries ago, knights spoke them aloud!",
+            "word_count": 15
+        }
+
+        resp = self.client.post("/api/gemini/doctor-script", json={
+            "script_id": "EF01",
+            "expression": "Silent letters",
+            "original_script": "Old draft text about silent letters"
+        })
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["data"]["script_id"], "EF01")
+        self.assertIn("knights", body["data"]["doctored_script"])
+
+
+class TestScriptDoctorService(unittest.TestCase):
+    def test_clean_script_output(self):
+        service = ScriptDoctorService(api_key="mock_key")
+        raw = "```text\nHere is the doctored script:\nThis is the actual script content.\nWord Count: 7 words\n```"
+        cleaned = service._clean_script_output(raw)
+        self.assertEqual(cleaned, "This is the actual script content.")
+
+    def test_empty_script_raises_error(self):
+        service = ScriptDoctorService(api_key="mock_key")
+        with self.assertRaises(ValueError):
+            service.doctor_script("EF01", "Silent letters", "")
+
+    def test_system_prompt_rules_enforcement(self):
+        # ROLEPLAY: 6 blocks, peer banter, no tutor tropes
+        self.assertIn("NO POLITE TUTOR", ROLEPLAY_SYSTEM_PROMPT)
+        self.assertIn("6-BLOCK PARAGRAPH STRUCTURE", ROLEPLAY_SYSTEM_PROMPT)
+        self.assertIn("145 to 180 words", ROLEPLAY_SYSTEM_PROMPT)
+
+        # GAME: spoken audio layer, option syntax, chalkboard exercise
+        self.assertIn("ABSOLUTE BAN ON RAW BLANKS", GAME_SYSTEM_PROMPT)
+        self.assertIn("ZERO connectors between options", GAME_SYSTEM_PROMPT)
+        self.assertIn("[CHALKBOARD_EXERCISE]", GAME_SYSTEM_PROMPT)
+
+        # FUN_FACTS: 100% factual integrity, 3 to 5 paragraphs
+        self.assertIn("100% FACTUAL INTEGRITY", FUN_FACTS_SYSTEM_PROMPT)
+        self.assertIn("3 TO 5 CLEAN NARRATIVE PARAGRAPHS", FUN_FACTS_SYSTEM_PROMPT)
+
+        # EXPRESSION: 5 paragraphs, word budget 85 to 110 words
+        self.assertIn("5-PARAGRAPH PROGRESSION", EXPRESSION_SYSTEM_PROMPT)
+        self.assertIn("85 to 110 words", EXPRESSION_SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":
