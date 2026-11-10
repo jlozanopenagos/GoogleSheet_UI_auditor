@@ -1,96 +1,82 @@
 @echo off
-setlocal enabledelayedexpansion
 title GoogleSheet UI Auditor
-
-echo ======================================================================
-echo   GoogleSheet UI Auditor - Windows 11 Studio Launcher
-echo ======================================================================
-echo.
-
 cd /d "%~dp0"
 
-:: 1. Detect Python or py launcher
-set "PYTHON_CMD="
-where py >nul 2>nul
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=py -3"
-    goto :python_found
-)
-
-where python >nul 2>nul
-if %errorlevel% equ 0 (
-    set "PYTHON_CMD=python"
-    goto :python_found
-)
-
-:: If Python is not installed, use Windows 11 winget
-echo [!] Python was not detected on this Windows 11 device.
-echo [*] Attempting to install Python via Windows Package Manager (winget)...
+echo ======================================================================
+echo   GoogleSheet UI Auditor - Studio Launcher
+echo ======================================================================
 echo.
-where winget >nul 2>nul
-if %errorlevel% equ 0 (
-    winget install Python.Python.3.11 --accept-package-agreements --accept-source-agreements
-    if %errorlevel% equ 0 (
-        echo.
-        echo [OK] Python installed successfully! Refreshing environment...
-        set "PATH=%LOCALAPPDATA%\Programs\Python\Python311;%LOCALAPPDATA%\Programs\Python\Python311\Scripts;%PATH%"
-        set "PYTHON_CMD=python"
-        goto :python_found
-    )
+
+:: 1. Detect Python command (py launcher or python)
+set "PY_CMD="
+where py >nul 2>&1 && set "PY_CMD=py"
+if "%PY_CMD%"=="" where python >nul 2>&1 && set "PY_CMD=python"
+
+if "%PY_CMD%"=="" goto :install_python
+
+echo [*] Python detected:
+%PY_CMD% --version
+echo.
+
+:: 2. Auto-initialize .env if missing
+if not exist .env if exist .env.example copy .env.example .env >nul
+
+:: 3. Setup virtual environment if missing
+if not exist .venv goto :create_venv
+goto :activate_venv
+
+:create_venv
+echo [*] Setting up local virtual environment...
+%PY_CMD% -m venv .venv
+if errorlevel 1 goto :run_direct
+
+:activate_venv
+if exist .venv\Scripts\activate.bat (
+    call .venv\Scripts\activate.bat
+    echo [*] Checking dependencies...
+    python -m pip install -r requirements.txt --quiet --disable-pip-version-check
+    echo.
+    echo [*] Starting GoogleSheet UI Auditor studio...
+    python run.py
+    goto :end
 )
 
-echo [!] Automatic installation failed or winget is unavailable.
-echo [*] Opening official Python download page...
+:run_direct
+echo [*] Checking dependencies with system Python...
+%PY_CMD% -m pip install -r requirements.txt --quiet --disable-pip-version-check
+echo.
+echo [*] Starting GoogleSheet UI Auditor studio...
+%PY_CMD% run.py
+goto :end
+
+:install_python
+echo [!] Python was not found on this Windows 11 device.
+echo [*] Attempting to install Python via winget...
+where winget >nul 2>&1
+if errorlevel 1 goto :manual_python
+
+winget install Python.Python.3.11 --accept-package-agreements --accept-source-agreements
+if errorlevel 1 goto :manual_python
+
+echo.
+echo [OK] Python installed! Please close and reopen start.bat.
+pause
+exit /b 0
+
+:manual_python
+echo.
+echo [!] Could not install Python automatically.
+echo [*] Opening official Python download page in your browser...
 start https://www.python.org/downloads/
 echo.
-echo Please install Python (check 'Add python.exe to PATH' during install),
-echo then run this script again.
+echo Please install Python (be sure to check 'Add python.exe to PATH'),
+echo then double-click start.bat again.
 pause
 exit /b 1
 
-:python_found
-echo [*] Using Python: %PYTHON_CMD%
-%PYTHON_CMD% --version
-echo.
-
-:: 2. Ensure .env exists
-if not exist ".env" (
-    if exist ".env.example" (
-        echo [*] No .env found. Creating .env from .env.example...
-        copy .env.example .env >nul
-        echo [!] Created .env file. Please check your GEMINI_API_KEY in .env if needed.
-        echo.
-    )
+:end
+if errorlevel 1 (
+    echo.
+    echo [!] Server exited. Press any key to close this window.
+    pause
 )
-
-:: 3. Setup / Activate Virtual Environment
-if not exist ".venv" (
-    echo [*] Creating isolated virtual environment (.venv)...
-    %PYTHON_CMD% -m venv .venv
-    if %errorlevel% neq 0 (
-        echo [!] Failed to create venv. Running with system python directly...
-        goto :run_system
-    )
-)
-
-echo [*] Activating virtual environment (.venv)...
-call .venv\Scripts\activate.bat
-
-echo [*] Checking dependencies...
-python -m pip install -r requirements.txt --quiet --disable-pip-version-check
-if %errorlevel% neq 0 (
-    echo [!] Warning: Some dependencies failed to install. Attempting launch anyway...
-)
-
-echo.
-echo [*] Launching GoogleSheet UI Auditor Studio...
-python run.py
-goto :done
-
-:run_system
-%PYTHON_CMD% -m pip install -r requirements.txt --quiet --disable-pip-version-check
-%PYTHON_CMD% run.py
-
-:done
-pause
-
