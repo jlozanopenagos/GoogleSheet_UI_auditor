@@ -35,13 +35,13 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, currentS
         </div>
 
         {/* Tab Navigation Controls */}
-        <div className="flex items-center gap-1.5 bg-brand-dark/80 p-1.5 rounded-2xl border border-brand-border shadow-inner">
+        <div className="flex items-center gap-1.5 bg-brand-dark/90 p-1.5 rounded-2xl border border-brand-border shadow-inner">
           <button
             onClick={() => onTabChange('script_auditor')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'script_auditor'
-                ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry text-white shadow-md shadow-brand-mulberry/25'
-                : 'text-brand-ice/70 hover:text-white hover:bg-brand-surface/60'
+                ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry text-white shadow-md shadow-brand-sky/20'
+                : 'text-slate-300 hover:text-white hover:bg-brand-surface/80'
             }`}
           >
             <FileEdit className="w-4 h-4" />
@@ -51,8 +51,8 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, currentS
             onClick={() => onTabChange('description_creation')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
               activeTab === 'description_creation'
-                ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry text-white shadow-md shadow-brand-mulberry/25'
-                : 'text-brand-ice/70 hover:text-white hover:bg-brand-surface/60'
+                ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry text-white shadow-md shadow-brand-sky/20'
+                : 'text-slate-300 hover:text-white hover:bg-brand-surface/80'
             }`}
           >
             <Sparkles className="w-4 h-4" />
@@ -66,11 +66,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, currentS
             href={currentScript.sheet_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden lg:flex items-center gap-2 text-xs font-semibold text-brand-ice bg-brand-wine/60 border border-brand-mulberry/60 px-3.5 py-2 rounded-xl hover:bg-brand-mulberry/50 hover:border-brand-sky/60 transition-all duration-150 shadow-sm"
+            className="hidden lg:flex items-center gap-2 text-xs font-semibold text-brand-sky bg-brand-card border border-brand-border px-3.5 py-2 rounded-xl hover:bg-brand-surface hover:border-brand-sky transition-all duration-150 shadow-sm"
           >
             <Sheet className="w-3.5 h-3.5 text-brand-sky" />
             <span>Open {formatSheetLabel(currentScript)} sheet</span>
-            <ExternalLink className="w-3 h-3 text-brand-ice/70" />
+            <ExternalLink className="w-3 h-3 text-slate-400" />
           </a>
         )}
       </div>

@@ -85,7 +85,7 @@ When the user submits an ID into the search bar:
   - **Gemini Script Doctor**: Top-right corner button with Gemini/Sparkles icon and tooltip `"change the script with Gemini"`. Reads Column C and doctors it into a fresh, out-of-the-box script adhering strictly to format rules and word budgets:
     - `EXPRESSION`: 85–110 words, 5-paragraph progression (Hook, Setup, Discovery, Example, Payoff).
     - `ROLEPLAY`: 145–180 words, 6-block peer dialogue (Narrator Hook, 4 dialogue exchanges with emotional tags, Narrator Payoff). Banned tutor tropes and bets.
-    - `GAME`: 95–125 spoken words across 5 sections (Hook, Challenge, Pressure, Answer, Explanation) + chalkboard exercise. No spoken blanks (`___`), strict option syntax (`A: `, `B: ` with period), zero connectors (`or`, `and`).
+    - `GAME`: 95–125 spoken words across 5 sections (Hook, Challenge, Pressure, Answer, Explanation). **Zero chalkboard graphic cards in spoken audio**. Zero isolated bare words (e.g. `Record` / `reCORD`), zero all-caps stress spoilers. Rotates through **6+ viral game mechanics** (Native Intuition Test, Collocation Duel, Minimal Pair Acoustic Test, Spot the Imposter, False Friend Ambush, Context Mystery) rather than repetitive "A/B" options.
     - `FUN_FACTS`: 95–135 words, 3–5 clean paragraphs (Hook, Historical/Phonetic mystery, Payoff). 100% factual integrity.
   - Automatically loads the doctored result into Column D and activates the Save button.
 - **Under the Right Box**:

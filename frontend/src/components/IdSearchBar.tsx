@@ -59,33 +59,33 @@ export const IdSearchBar: React.FC<IdSearchBarProps> = ({ onSearch, isLoading, a
       </form>
 
       {/* Prefix Discovery Helper */}
-      <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs text-brand-ice/70">
-        <span className="font-semibold text-brand-ice/50">Quick test:</span>
+      <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+        <span className="font-semibold text-slate-500">Quick test:</span>
         <button
           type="button"
           onClick={() => handleQuickSelect('EE01')}
-          className="px-2.5 py-1 bg-brand-card hover:bg-brand-wine/70 border border-brand-border/60 hover:border-brand-amethyst/60 text-brand-ice rounded-lg transition-colors mono-font text-xs"
+          className="px-2.5 py-1 bg-brand-card hover:bg-brand-card/80 border border-brand-border hover:border-brand-sky/60 text-slate-200 rounded-lg transition-colors mono-font text-xs"
         >
           EE01 (English expression)
         </button>
         <button
           type="button"
           onClick={() => handleQuickSelect('EG03')}
-          className="px-2.5 py-1 bg-brand-card hover:bg-brand-wine/70 border border-brand-border/60 hover:border-brand-amethyst/60 text-brand-ice rounded-lg transition-colors mono-font text-xs"
+          className="px-2.5 py-1 bg-brand-card hover:bg-brand-card/80 border border-brand-border hover:border-brand-sky/60 text-slate-200 rounded-lg transition-colors mono-font text-xs"
         >
           EG03 (English game)
         </button>
         <button
           type="button"
           onClick={() => handleQuickSelect('FR02')}
-          className="px-2.5 py-1 bg-brand-card hover:bg-brand-wine/70 border border-brand-border/60 hover:border-brand-amethyst/60 text-brand-ice rounded-lg transition-colors mono-font text-xs"
+          className="px-2.5 py-1 bg-brand-card hover:bg-brand-card/80 border border-brand-border hover:border-brand-sky/60 text-slate-200 rounded-lg transition-colors mono-font text-xs"
         >
           FR02 (French roleplay)
         </button>
         <button
           type="button"
           onClick={() => handleQuickSelect('SF01')}
-          className="px-2.5 py-1 bg-brand-card hover:bg-brand-wine/70 border border-brand-border/60 hover:border-brand-amethyst/60 text-brand-ice rounded-lg transition-colors mono-font text-xs"
+          className="px-2.5 py-1 bg-brand-card hover:bg-brand-card/80 border border-brand-border hover:border-brand-sky/60 text-slate-200 rounded-lg transition-colors mono-font text-xs"
         >
           SF01 (Spanish fun facts)
         </button>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GoogleSheet UI Auditor</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -19,12 +20,12 @@
                 amethyst: '#6b5ca5',   // Purple-violet (secondary, badges, soft glow)
                 mulberry: '#72195a',   // Deep fuchsia rose (accents, gradients)
                 wine: '#4c1036',       // Deep rich wine (containers, headers, borders)
-                dark: '#130617',       // Midnight wine canvas background
-                surface: '#1c0a22',    // Card / panel container background
-                card: '#240f2c',       // Elevated card background
-                input: '#120516',      // Form input & textarea background
-                border: '#3d1645',     // Subtle container border
-                borderHover: '#6b5ca5' // Border hover accent
+                dark: '#0b0f17',       // Sleek neutral obsidian dark canvas
+                surface: '#151b26',    // Balanced neutral dark card background
+                card: '#1c2331',       // Elevated dark slate card surface
+                input: '#0e1219',      // Deep clean input & textarea surface
+                border: '#263042',     // Balanced slate border
+                borderHover: '#71a9f7' // Border hover accent
               }
             },
             fontFamily: {
@@ -38,32 +39,32 @@
     <style>
       body {
         font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-        background-color: #130617;
-        color: #f5f2f9;
+        background-color: #0b0f17;
+        color: #f1f5f9;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
       code, pre, textarea.mono-font, .mono-font {
         font-family: 'JetBrains Mono', monospace;
       }
-      /* Custom scrollbar with palette tones */
+      /* Custom balanced scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #130617;
+        background: #0b0f17;
       }
       ::-webkit-scrollbar-thumb {
-        background: #4c1036;
+        background: #263042;
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #6b5ca5;
+        background: #71a9f7;
       }
     </style>
   </head>
-  <body class="min-h-screen bg-brand-dark text-gray-100 antialiased selection:bg-brand-amethyst selection:text-white">
+  <body class="min-h-screen bg-brand-dark text-slate-100 antialiased selection:bg-brand-sky/40 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

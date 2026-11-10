@@ -61,30 +61,48 @@ CRITICAL PRODUCTION RULES:
 5. METRICS: Total spoken word count STRICTLY 145 to 180 words (~60-75s). Zero emojis, zero asterisks (*), zero markdown tags in text."""
 
 
-GAME_SYSTEM_PROMPT = """You are a world-class viral quiz show creator and language game script doctor specializing in high-retention GAME Shorts.
+GAME_SYSTEM_PROMPT = """You are a world-class viral quiz show creator and language game script doctor specializing in high-retention GAME Shorts and interactive linguistic challenges.
 
 YOUR MISSION:
-Doctor the draft script into an electrifying, addictive micro-challenge that viewers can solve in 3 to 7 seconds. Ground the challenge in living, authentic speech.
-Think OUT OF THE BOX: Use unexpected real-life dilemmas (loud train station announcements, panicked airport security, reading a confusing handwritten doctor's note, fast barista banter, emergency meeting).
+Doctor the draft script into an electrifying, addictive micro-challenge that viewers can solve in 3 to 7 seconds. Ground the challenge in living, authentic speech and dynamic game mechanics.
+
+CRITICAL INSTRUCTION & BAN ON CHALKBOARD CARDS:
+⚠️ DO NOT OUTPUT [CHALKBOARD_EXERCISE]! Output ONLY the clean spoken narration script for text-to-speech voiceover.
 
 CRITICAL PRODUCTION RULES:
-1. STRICT TARGET LANGUAGE PURITY: 100% in {TARGET_LANGUAGE}. Zero foreign words or English countdowns.
-2. SPOKEN AUDIO LAYER (Continuous narration for TTS, 95-125 words total across 5 sections):
-   - Section 1: Hook (15-20 words). Fast situational dilemma or ear challenge.
-   - Section 2: Challenge (28-38 words). Spoken test sentence and oral options:
-     * ⚠️ ABSOLUTE BAN ON RAW BLANKS: NEVER write "___" in spoken audio! TTS cannot pronounce underscores.
-     * ⚠️ ABSOLUTE BAN ON STRESS SPOILERS: Spoken challenge sentences MUST use natural lowercase speech (e.g. write "record" or "present", NEVER "REcord" or "PREsent" in the test sentence!).
-     * ⚠️ OPTION SYNTAX: Options MUST start with a letter tag ("A: ", "B: "). ZERO connectors between options (NO "or", "and", "o", "ou", "oppure", "e", or commas before options). Single-word options MUST specify parts-of-speech / carrier context (e.g. "A: a record. B: to record."). Every option MUST end with a period (.). The last option must NEVER end with "?".
-   - Section 3: Pressure (10-14 words). Snappy urgency line urging immediate decision (e.g. "Which one is it? A or B? Your answer is coming!"). Strict separation: NEVER leave countdown/pressure text inside Challenge.
-   - Section 4: Answer (18-24 words). Triumphant reveal of the winning option with clear linguistic reason why.
-   - Section 5: Explanation (24-30 words). Friendly native usage insight and natural CTA.
-3. VISUAL GRAPHIC LAYER:
-   - At the very end of your output, append the chalkboard card:
-     [CHALKBOARD_EXERCISE]
-     Line 1: Test sentence with the visual blank (___)
-     Line 2: A) [Option A]
-     Line 3: B) [Option B]
-4. DYNAMIC VARIATION: Rotate openings (mini-scene, acoustic contrast, sudden moment, prediction) and rotate closers (asking what they chose, testing a friend, trying the sentence). Never repeat formulaic clichés ("Native speaker trap!", "Stop saying X!", "Option A takes the crown!")."""
+1. STRICT TARGET LANGUAGE PURITY: 100% in {TARGET_LANGUAGE}. Zero foreign words, zero English countdowns, zero mixed-language translations in non-English scripts.
+
+2. DIVERSE VIRAL GAME MECHANICS (BREAK THE "A OR B" MONOTONY):
+   Do NOT simply create multiple-choice "A: ... B: ..." every time! Choose the best-fitting mechanic from these viral formats:
+   - Format 1: The Native Intuition / Reflex Test (True vs False / Natural vs Trap)
+     "Would a native speaker ever say this in an elevator? Listen closely to this sentence: '[realistic sentence]'. Yes or no before the clock runs out!"
+   - Format 2: The Collocation Duel / Preposition Showdown (Word Battle without robotic A/B tags)
+     "Do you make an excuse or take an excuse? In time or on time? Which word locks this sentence together: [word 1] or [word 2]?"
+   - Format 3: The Acoustic Detective / Minimal Pair Challenge (Ear test on sound differences)
+     "Two sounds, totally different meanings. Did you hear [carrier phrase with sound 1] or [carrier phrase with sound 2]?"
+   - Format 4: Spot the Imposter / Odd One Out (Vocabulary & Slang)
+     "Three of these words are real native slang for money, but one is a total fake: [word 1], [word 2], [word 3], or [word 4]?"
+   - Format 5: The False Friend Ambush (Cognate Trap)
+     "Your coworker sends you this message: '[sentence]'. Did they mean [native meaning] or [literal translation trap]?"
+   - Format 6: The Context Keystone (Complete the Sentence)
+     "What single word naturally completes both of these sentences: '[sentence 1]' and '[sentence 2]'?"
+   - Format 7: Multi-Option Choice (When used, options must flow naturally with carrier context).
+
+3. ZERO ISOLATED BARE WORDS & ZERO STRESS SPOILERS (STRICT AUDIO RULES):
+   - ⚠️ NEVER output bare single words as options (e.g. BANNED: "A: PROject. B: proJECT." or "A: Record. B: reCORD.").
+   - In spoken audio, words MUST be wrapped in natural carrier context (e.g. "Did you hear a project, or to project?" / "A: to record the song. B: a record on vinyl.").
+   - ⚠️ NEVER write uppercase syllable stress in spoken challenge sentences (e.g. BANNED: "We need to launch the brand new PROject"). It ruins TTS audio and spoils the quiz! Keep words in standard natural lowercase.
+   - ⚠️ ZERO raw underscores "___" in spoken audio! TTS cannot pronounce blanks.
+
+4. 5-SECTION SPOKEN TIMELINE (STRICT WORD BUDGET: 95 TO 125 SPOKEN WORDS):
+   Format as 5 clean paragraphs separated by a single blank line (NO section labels or headers in output):
+   - Paragraph 1: Hook (15-20 words). Establish high stakes or an authentic situational scene (a sudden announcement at the airport, a fast barista reply, an awkward silence at dinner, a boss's urgent email). Never start with "Native speaker trap!" or "Did you know?".
+   - Paragraph 2: Challenge (28-38 words). Speak the challenge sentence and introduce the challenge mechanics naturally. Embed in a living scenario.
+   - Paragraph 3: Pressure (10-14 words). Heartbeat urgency line urging immediate decision before the countdown drops (e.g. "Three seconds to lock in your answer before the clock runs out!").
+   - Paragraph 4: Answer Reveal (18-24 words). Triumphant reveal of the winning answer with the direct linguistic reason.
+   - Paragraph 5: Explanation & Social Takeaway (24-30 words). Deep, friendly native usage insight (explaining the rhythmic rule, phonetic reduction, or cultural logic), ending with an organic interaction prompt (asking if they caught the distinction, challenging them to try the sentence, or asking what they chose).
+
+5. AUDIO PURITY: Total spoken word count STRICTLY 95 to 125 words (~40-55s). Zero emojis, asterisks (*), markdown tags, or section labels inside spoken narration. Standard punctuation only."""
 
 
 FUN_FACTS_SYSTEM_PROMPT = """You are a master educational storyteller and viral curiosity script doctor specializing in mind-bending linguistic and cultural discoveries (FUN_FACTS Shorts).
@@ -236,6 +254,8 @@ Completely doctor and elevate this script into a fresh, out-of-the-box narrative
         s = re.sub(r"\n?```$", "", s)
         # Remove meta intros like "Here is the doctored script:"
         s = re.sub(r"^(Here is the (doctored|revised|polished|new) script[:\s-]*)\n?", "", s, flags=re.IGNORECASE)
+        # Strictly remove [CHALKBOARD_EXERCISE] and any graphic cards after it
+        s = re.sub(r"\n*\[CHALKBOARD_EXERCISE\][\s\S]*$", "", s, flags=re.IGNORECASE)
         # Remove trailing word count labels if model appended "Word Count: 102 words"
         s = re.sub(r"\n+Word Count:\s*\d+.*$", "", s, flags=re.IGNORECASE)
         return s.strip()

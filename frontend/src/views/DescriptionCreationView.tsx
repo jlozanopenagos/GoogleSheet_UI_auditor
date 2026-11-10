@@ -132,15 +132,15 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-brand-surface border border-brand-border p-4.5 rounded-2xl shadow-xl">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-brand-wine/80 text-brand-ice border border-brand-mulberry/60 mono-font">
+            <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-brand-card text-brand-sky border border-brand-border mono-font">
               {formatTag(script)}
             </span>
-            <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-brand-card text-brand-sky border border-brand-amethyst/50">
+            <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-brand-card text-brand-amethyst border border-brand-border">
               YouTube Shorts SEO
             </span>
           </div>
           <h2 className="text-lg font-bold text-white mt-1.5 tracking-tight">
-            Editing <span className="text-brand-sky mono-font font-extrabold">{script.ID}</span> · <span className="text-brand-ice font-medium">"{script.expression || 'No expression label'}"</span>
+            Editing <span className="text-brand-sky mono-font font-extrabold">{script.ID}</span> · <span className="text-slate-200 font-medium">"{script.expression || 'No expression label'}"</span>
           </h2>
         </div>
 
@@ -149,7 +149,7 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
             href={script.sheet_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-brand-sky hover:text-brand-ice font-semibold transition-colors"
+            className="flex items-center gap-1.5 text-xs text-brand-sky hover:text-white bg-brand-card border border-brand-border px-3 py-1.5 rounded-xl hover:border-brand-sky transition-colors font-semibold"
           >
             <span>Open in Google Sheet</span>
             <ExternalLink className="w-3.5 h-3.5" />

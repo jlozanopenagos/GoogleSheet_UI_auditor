@@ -200,7 +200,7 @@ class TestFastApiEndpoints(unittest.TestCase):
 class TestScriptDoctorService(unittest.TestCase):
     def test_clean_script_output(self):
         service = ScriptDoctorService(api_key="mock_key")
-        raw = "```text\nHere is the doctored script:\nThis is the actual script content.\nWord Count: 7 words\n```"
+        raw = "```text\nHere is the doctored script:\nThis is the actual script content.\n\n[CHALKBOARD_EXERCISE]\nLine 1: Test ___\nLine 2: A) Option A\nWord Count: 7 words\n```"
         cleaned = service._clean_script_output(raw)
         self.assertEqual(cleaned, "This is the actual script content.")
 
@@ -215,10 +215,11 @@ class TestScriptDoctorService(unittest.TestCase):
         self.assertIn("6-BLOCK PARAGRAPH STRUCTURE", ROLEPLAY_SYSTEM_PROMPT)
         self.assertIn("145 to 180 words", ROLEPLAY_SYSTEM_PROMPT)
 
-        # GAME: spoken audio layer, option syntax, chalkboard exercise
-        self.assertIn("ABSOLUTE BAN ON RAW BLANKS", GAME_SYSTEM_PROMPT)
-        self.assertIn("ZERO connectors between options", GAME_SYSTEM_PROMPT)
-        self.assertIn("[CHALKBOARD_EXERCISE]", GAME_SYSTEM_PROMPT)
+        # GAME: diverse game mechanics, zero bare words, no chalkboard card
+        self.assertIn("DO NOT OUTPUT [CHALKBOARD_EXERCISE]", GAME_SYSTEM_PROMPT)
+        self.assertIn("DIVERSE VIRAL GAME MECHANICS", GAME_SYSTEM_PROMPT)
+        self.assertIn("ZERO ISOLATED BARE WORDS", GAME_SYSTEM_PROMPT)
+        self.assertIn("95 to 125 words", GAME_SYSTEM_PROMPT)
 
         # FUN_FACTS: 100% factual integrity, 3 to 5 paragraphs
         self.assertIn("100% FACTUAL INTEGRITY", FUN_FACTS_SYSTEM_PROMPT)
