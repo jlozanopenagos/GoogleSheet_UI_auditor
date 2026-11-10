@@ -215,9 +215,10 @@ class TestScriptDoctorService(unittest.TestCase):
         self.assertIn("6-BLOCK PARAGRAPH STRUCTURE", ROLEPLAY_SYSTEM_PROMPT)
         self.assertIn("145 to 180 words", ROLEPLAY_SYSTEM_PROMPT)
 
-        # GAME: diverse game mechanics, zero bare words, no chalkboard card
+        # GAME: logical coherence, multiple choice with carrier context, zero bare words, no chalkboard card
         self.assertIn("DO NOT OUTPUT [CHALKBOARD_EXERCISE]", GAME_SYSTEM_PROMPT)
-        self.assertIn("DIVERSE VIRAL GAME MECHANICS", GAME_SYSTEM_PROMPT)
+        self.assertIn("LOGICAL COHERENCE & CHALLENGE TYPES", GAME_SYSTEM_PROMPT)
+        self.assertIn("MULTIPLE CHOICE IS ENCOURAGED", GAME_SYSTEM_PROMPT)
         self.assertIn("ZERO ISOLATED BARE WORDS", GAME_SYSTEM_PROMPT)
         self.assertIn("95 to 125 words", GAME_SYSTEM_PROMPT)
 
