@@ -11,9 +11,18 @@ from pathlib import Path
 import uvicorn
 
 # Ensure backend directory is in sys.path
-backend_dir = Path(__file__).resolve().parent / "backend"
+root_dir = Path(__file__).resolve().parent
+backend_dir = root_dir / "backend"
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
+
+# Auto-initialize .env from .env.example if missing
+env_file = root_dir / ".env"
+env_example = root_dir / ".env.example"
+if not env_file.exists() and env_example.exists():
+    import shutil
+    shutil.copy(env_example, env_file)
+    print("[*] Initialized .env from .env.example")
 
 # pyrefly: ignore[missing-import]
 from app.core.config import settings

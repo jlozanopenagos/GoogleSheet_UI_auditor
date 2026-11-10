@@ -49,23 +49,33 @@ A standalone, high-performance web application designed for rapid auditing, edit
 
 ---
 
-## Quick Start
+## Quick Start (Any Windows 11 PC or Tablet)
 
-### 1. Prerequisites
-- Python 3.10+ (Windows `py` launcher or `python3`)
-- Node.js 18+ (only if rebuilding frontend sources)
+### Option A: One-Click Launcher (`start.bat` — Recommended)
+Simply double-click **`start.bat`** in the project folder:
+1. Automatically detects if Python is installed. If not, installs Python 3.11 automatically using Windows 11's built-in `winget`.
+2. Creates an isolated `.venv` environment and installs the lightweight requirements (`requirements.txt`).
+3. Auto-initializes `.env` from `.env.example` if not already present.
+4. Starts the studio at `http://127.0.0.1:8005` and launches your default web browser in desktop view.
 
-### 2. Launch the Application
-Run the root launcher:
+> **Zero Node.js Required**: The pre-compiled production frontend bundle is included directly in `frontend/dist/`. Any device can run the full studio without installing Node.js, npm, or build tools!
+
+---
+
+### Option B: Manual Command Line
 ```powershell
-py run.py
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Launch Studio
+python run.py
 ```
 - Starts the FastAPI backend on `http://127.0.0.1:8005`.
 - Automatically opens the application in your default web browser.
 
 Optional flags:
 ```powershell
-py run.py --port 8080 --no-browser
+python run.py --port 8080 --no-browser
 ```
 
 ---
