@@ -243,3 +243,4 @@ Completely doctor and elevate this script into a fresh, out-of-the-box narrative
 
 # Shared singleton instance
 script_doctor_service = ScriptDoctorService()
+

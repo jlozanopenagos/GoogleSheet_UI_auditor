@@ -20,9 +20,11 @@ export const App: React.FC = () => {
     try {
       const record = await fetchScriptById(id);
       setCurrentScript(record);
+      const lang = record.language ? record.language.charAt(0).toUpperCase() + record.language.slice(1).toLowerCase() : '';
+      const vtype = record.video_type ? record.video_type.replace('_', ' ').toLowerCase() : '';
       setNotification({
         type: 'success',
-        message: `Successfully loaded ${record.ID} (${record.language.toUpperCase()} ${record.video_type.toUpperCase()}) from Google Sheet.`,
+        message: `Successfully loaded ${record.ID} (${lang} · ${vtype}) from Google Sheets.`,
       });
     } catch (err: any) {
       setNotification({
@@ -47,7 +49,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] flex flex-col text-gray-100">
+    <div className="min-h-screen bg-brand-dark flex flex-col text-brand-ice">
       {/* Top Application Header */}
       <Header
         activeTab={activeTab}
@@ -95,8 +97,8 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800/80 bg-[#0b0f19] py-4 text-center text-xs text-gray-500">
-        GoogleSheet_UI_auditor • Standalone Studio for 16 Multi-Language YouTube Shorts Spreadsheets
+      <footer className="border-t border-brand-border bg-brand-dark py-4 text-center text-xs text-brand-ice/50">
+        GoogleSheet UI Auditor · Multi-language studio for YouTube Shorts spreadsheets
       </footer>
     </div>
   );
