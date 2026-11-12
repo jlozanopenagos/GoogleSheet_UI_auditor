@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, Any, List
+import time
+from typing import Dict, Any, List, Tuple
 import requests
 
 from ..core.config import settings
@@ -155,6 +156,32 @@ class ScriptDoctorService:
         self.model = model or settings.gemini_model
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models"
 
+    def validate_doctored_script(self, text: str, finish_reason: str = "STOP", vtype: str = "") -> Tuple[bool, str]:
+        """
+        Validates the doctored script for completeness and lack of truncation.
+        """
+        if not text or not text.strip():
+            return False, "Script output is empty"
+
+        clean = text.strip()
+
+        if finish_reason == "MAX_TOKENS":
+            return False, "Response was truncated by token limit (finishReason=MAX_TOKENS)"
+        if finish_reason in ("SAFETY", "RECITATION", "OTHER"):
+            return False, f"Response was prematurely stopped by API (finishReason={finish_reason})"
+
+        words = clean.split()
+        min_words = 80 if vtype == "roleplay" else 50
+        if len(words) < min_words:
+            return False, f"Script output is too short ({len(words)} words; expected >= {min_words})"
+
+        # Clean terminal punctuation check
+        last_char = clean[-1]
+        if last_char not in ('.', '!', '?', '"', "'", ')'):
+            return False, f"Script terminated abruptly mid-sentence (ends with: '{clean[-25:]}')"
+
+        return True, "Valid"
+
     def doctor_script(
         self,
         script_id: str,
@@ -163,7 +190,7 @@ class ScriptDoctorService:
     ) -> Dict[str, Any]:
         """
         Rewrites/doctors a script completely using Gemini, applying format-specific rules,
-        anti-repetition safeguards, and out-of-the-box narrative creativity.
+        anti-repetition safeguards, and out-of-the-box narrative creativity with auto-retry resilience.
         """
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not configured in .env.")
@@ -200,60 +227,109 @@ Instruction:
 Completely doctor and elevate this script into a fresh, out-of-the-box narrative that strictly adheres to the format structure, word budget, and linguistic authenticity rules. Deliver ONLY the clean, production-ready script text."""
 
         endpoint = f"{self.base_url}/{self.model}:generateContent?key={self.api_key}"
-        payload = {
-            "system_instruction": {
-                "parts": [{"text": system_prompt}]
-            },
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": user_prompt}]
+
+        max_retries = 3
+        backoff_seconds = 1.0
+        last_error = ""
+
+        for attempt in range(1, max_retries + 1):
+            current_temp = round(0.82 + ((attempt - 1) * 0.04), 2)
+            payload = {
+                "system_instruction": {
+                    "parts": [{"text": system_prompt}]
+                },
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": user_prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": current_temp,
+                    "maxOutputTokens": 1200  # Ceiling to guarantee complete multi-block scripts
                 }
-            ],
-            "generationConfig": {
-                "temperature": 0.82,  # Higher temperature for out-of-the-box creative variety
-                "maxOutputTokens": 900
             }
-        }
 
-        try:
-            resp = requests.post(
-                endpoint,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=settings.request_timeout
-            )
-        except Exception as e:
-            raise ConnectionError(f"Network error communicating with Gemini API: {e}")
-
-        if resp.status_code != 200:
-            err_msg = resp.text
             try:
-                err_msg = resp.json().get("error", {}).get("message", resp.text)
-            except Exception:
-                pass
-            raise RuntimeError(f"Gemini API Error (HTTP {resp.status_code}): {err_msg}")
+                resp = requests.post(
+                    endpoint,
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=settings.request_timeout
+                )
+            except requests.exceptions.RequestException as e:
+                last_error = f"Network connection error: {e}"
+                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} connection error: {last_error}")
+                if attempt < max_retries:
+                    time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+                    continue
+                raise ConnectionError(f"Network error communicating with Gemini API after {max_retries} attempts: {e}")
 
-        data = resp.json()
-        raw_text = self._extract_text(data)
-        doctored_script = self._clean_script_output(raw_text)
-        word_count = len(doctored_script.split())
+            if resp.status_code != 200:
+                err_msg = resp.text
+                try:
+                    err_msg = resp.json().get("error", {}).get("message", resp.text)
+                except Exception:
+                    pass
 
-        return {
-            "script_id": parsed.canonical_id,
-            "expression": expression,
-            "doctored_script": doctored_script,
-            "word_count": word_count
-        }
+                last_error = f"HTTP {resp.status_code}: {err_msg}"
+                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} API error: {last_error}")
 
-    def _extract_text(self, data: Dict[str, Any]) -> str:
+                if attempt < max_retries and resp.status_code in (429, 500, 502, 503, 504):
+                    time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+                    continue
+
+                raise RuntimeError(f"Gemini API Error (HTTP {resp.status_code}): {err_msg}")
+
+            data = resp.json()
+            try:
+                raw_text, finish_reason = self._extract_text_and_finish_reason(data)
+            except RuntimeError as e:
+                last_error = str(e)
+                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} extraction error: {last_error}")
+                if attempt < max_retries:
+                    time.sleep(backoff_seconds)
+                    continue
+                raise
+
+            doctored_script = self._clean_script_output(raw_text)
+
+            is_valid, check_reason = self.validate_doctored_script(doctored_script, finish_reason, vtype)
+            if not is_valid:
+                last_error = f"Validation failed ({check_reason})"
+                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} invalid: {last_error}")
+                if attempt < max_retries:
+                    time.sleep(backoff_seconds)
+                    continue
+                raise RuntimeError(
+                    f"Gemini generated invalid/incomplete script after {max_retries} attempts: {check_reason}"
+                )
+
+            word_count = len(doctored_script.split())
+
+            return {
+                "script_id": parsed.canonical_id,
+                "expression": expression,
+                "doctored_script": doctored_script,
+                "word_count": word_count
+            }
+
+        raise RuntimeError(f"Gemini script doctoring failed after {max_retries} attempts: {last_error}")
+
+    def _extract_text_and_finish_reason(self, data: Dict[str, Any]) -> Tuple[str, str]:
         candidates = data.get("candidates", [])
         if not candidates:
             raise RuntimeError("Gemini API returned zero candidate responses.")
-        parts = candidates[0].get("content", {}).get("parts", [])
+        candidate = candidates[0]
+        finish_reason = candidate.get("finishReason", "STOP")
+        parts = candidate.get("content", {}).get("parts", [])
         if not parts:
             raise RuntimeError("Gemini response contained no text parts.")
-        return parts[0].get("text", "")
+        return parts[0].get("text", ""), finish_reason
+
+    def _extract_text(self, data: Dict[str, Any]) -> str:
+        text, _ = self._extract_text_and_finish_reason(data)
+        return text
 
     def _clean_script_output(self, text: str) -> str:
         s = text.strip()

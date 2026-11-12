@@ -21,6 +21,8 @@ from app.services.prompt_service import PromptService
 # pyrefly: ignore[missing-import]
 from app.services.sheet_service import SheetService, ScriptNotFoundError
 # pyrefly: ignore[missing-import]
+from app.services.gemini_service import GeminiService, GeminiServiceError, gemini_service
+# pyrefly: ignore[missing-import]
 from app.services.script_doctor_service import (
     ScriptDoctorService,
     ROLEPLAY_SYSTEM_PROMPT,
@@ -231,6 +233,215 @@ class TestScriptDoctorService(unittest.TestCase):
         self.assertIn("85 to 110 words", EXPRESSION_SYSTEM_PROMPT)
 
 
+class TestGeminiServiceValidationAndResilience(unittest.TestCase):
+    def setUp(self):
+        self.service = GeminiService(api_key="mock_key", model="gemini-2.5-flash")
+
+    def test_validate_description_valid(self):
+        valid_desc = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+            "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story in the comments! 👇\n\n"
+            "#Shorts #LearnItalian #ItalianTips #ItalianoAutentico #LearnItalian"
+        )
+        is_valid, reason = self.service.validate_description_output(valid_desc, finish_reason="STOP")
+        self.assertTrue(is_valid)
+        self.assertEqual(reason, "Valid")
+
+    def test_validate_description_truncated_token_limit(self):
+        desc = "A good start to a description that was cut off by max tokens..."
+        is_valid, reason = self.service.validate_description_output(desc, finish_reason="MAX_TOKENS")
+        self.assertFalse(is_valid)
+        self.assertIn("truncated by token limit", reason)
+
+    def test_validate_description_truncated_mid_sentence(self):
+        mid_sentence = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double consonant secret native Italians use to get it right every single time in a busy"
+        )
+        is_valid, reason = self.service.validate_description_output(mid_sentence, finish_reason="STOP")
+        self.assertFalse(is_valid)
+        self.assertIn("truncated mid-sentence", reason)
+
+    def test_validate_description_too_short(self):
+        short = "This is a one-liner description with a hashtag #Shorts"
+        is_valid, reason = self.service.validate_description_output(short, finish_reason="STOP")
+        self.assertFalse(is_valid)
+        self.assertIn("too short", reason)
+
+    def test_validate_description_missing_hashtags(self):
+        no_tags = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+            "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story in the comments below!"
+        )
+        is_valid, reason = self.service.validate_description_output(no_tags, finish_reason="STOP")
+        self.assertFalse(is_valid)
+        self.assertIn("missing discovery hashtags", reason)
+
+    @patch("time.sleep", return_value=None)
+    @patch("requests.post")
+    def test_generate_short_description_network_retry_success(self, mock_post, mock_sleep):
+        # Attempt 1: network exception, Attempt 2: success
+        success_body = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": (
+                                    "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+                                    "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+                                    "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+                                    "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story below! 👇\n\n"
+                                    "#Shorts #LearnItalian #ItalianTips"
+                                )
+                            }
+                        ]
+                    },
+                    "finishReason": "STOP"
+                }
+            ]
+        }
+        mock_resp_success = MagicMock(status_code=200)
+        mock_resp_success.json.return_value = success_body
+
+        import requests
+        mock_post.side_effect = [
+            requests.exceptions.ConnectionError("Connection timed out"),
+            mock_resp_success
+        ]
+
+        result = self.service.generate_short_description(
+            script_id="IE07",
+            expression="Doppie consonanti",
+            script_changed="Narrator: Watch out for double consonants in Italian!"
+        )
+        self.assertEqual(result.script_id, "IE07")
+        self.assertIn("#LearnItalian", result.hashtags)
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch("time.sleep", return_value=None)
+    @patch("requests.post")
+    def test_generate_short_description_validation_retry_success(self, mock_post, mock_sleep):
+        # Attempt 1: truncated response (MAX_TOKENS), Attempt 2: valid complete response
+        truncated_body = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{"text": "You order espresso at a bustling Milan cafe..."}]
+                    },
+                    "finishReason": "MAX_TOKENS"
+                }
+            ]
+        }
+        success_body = {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": (
+                                    "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+                                    "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+                                    "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+                                    "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story below! 👇\n\n"
+                                    "#Shorts #LearnItalian #ItalianTips"
+                                )
+                            }
+                        ]
+                    },
+                    "finishReason": "STOP"
+                }
+            ]
+        }
+        mock_resp_trunc = MagicMock(status_code=200)
+        mock_resp_trunc.json.return_value = truncated_body
+
+        mock_resp_success = MagicMock(status_code=200)
+        mock_resp_success.json.return_value = success_body
+
+        mock_post.side_effect = [mock_resp_trunc, mock_resp_success]
+
+        result = self.service.generate_short_description(
+            script_id="IE07",
+            expression="Doppie consonanti",
+            script_changed="Narrator: Watch out for double consonants in Italian!"
+        )
+        self.assertEqual(result.script_id, "IE07")
+        self.assertIn("#LearnItalian", result.hashtags)
+        self.assertEqual(mock_post.call_count, 2)
+
+
+class TestPromptServiceAntiBias(unittest.TestCase):
+    def test_system_prompts_free_of_hardcoded_cliches(self):
+        # Ensure the old repetitive examples are completely removed
+        banned_phrases = [
+            "ultimate forbidden phrase",
+            "forbidden phrase before their big moment",
+            "Think wishing someone good luck is harmless",
+            "kuh-night and kuh-nee",
+            "Who is the friend that always accidentally jinxes everything"
+        ]
+        for vtype in ["expression", "game", "roleplay", "fun_facts"]:
+            prompt = PromptService.build_system_prompt(vtype, "english")
+            for phrase in banned_phrases:
+                self.assertNotIn(
+                    phrase,
+                    prompt,
+                    f"Prompt for format '{vtype}' contains biased anchor phrase: '{phrase}'"
+                )
+
+    def test_system_prompts_mandate_situational_grounding(self):
+        prompt = PromptService.build_system_prompt("roleplay", "spanish")
+        self.assertIn("SITUATIONAL GROUNDING", prompt)
+        self.assertIn("BANNED CLICHÉS", prompt)
+        self.assertIn("100% in Spanish", prompt)
+
+
+class TestScriptDoctorValidation(unittest.TestCase):
+    def setUp(self):
+        self.service = ScriptDoctorService(api_key="mock_key")
+
+    def test_validate_doctored_script_valid(self):
+        valid_script = (
+            "Narrator (energetic): You thought asking for a glass of tap water in Paris was easy.\n\n"
+            "PERSON_ONE (hesitant): Excusez-moi, est-ce que je peux avoir de l'eau s'il vous plaît?\n"
+            "PERSON_TWO (smirking): De l'eau en bouteille à dix euros ou une carafe gratuite?\n\n"
+            "PERSON_ONE (shocked): Attends, il y a un mot magique pour ne pas payer dix euros?\n"
+            "PERSON_TWO (confident): Une carafe d'eau. C'est la loi, c'est gratuit et c'est parfait.\n\n"
+            "PERSON_ONE (relieved): Une carafe d'eau fraîche, s'il vous plaît!\n"
+            "PERSON_TWO (approving): Voilà, maintenant tu commandes comme un vrai Parisien!\n\n"
+            "Narrator: Never pay tourist prices for tap water again. Drop your best French travel tip below!"
+        )
+        is_valid, reason = self.service.validate_doctored_script(valid_script, finish_reason="STOP", vtype="roleplay")
+        self.assertTrue(is_valid)
+        self.assertEqual(reason, "Valid")
+
+    def test_validate_doctored_script_truncated(self):
+        is_valid, reason = self.service.validate_doctored_script("Some script", finish_reason="MAX_TOKENS", vtype="game")
+        self.assertFalse(is_valid)
+        self.assertIn("MAX_TOKENS", reason)
+
+    def test_validate_doctored_script_abrupt_ending(self):
+        script_abrupt = (
+            "Narrator (energetic): You thought asking for a glass of tap water in Paris was easy.\n\n"
+            "PERSON_ONE (hesitant): Excusez-moi, est-ce que je peux avoir de l'eau s'il vous plaît?\n"
+            "PERSON_TWO (smirking): De l'eau en bouteille à dix euros ou une carafe gratuite?\n\n"
+            "PERSON_ONE (shocked): Attends, il y a un mot magique pour ne pas payer dix euros?\n"
+            "PERSON_TWO (confident): Une carafe d'eau. C'est la loi, c'est gratuit et c'est parfait.\n\n"
+            "PERSON_ONE (relieved): Une carafe d'eau fraîche, s'il vous plaît!\n"
+            "PERSON_TWO (approving): Voilà, maintenant tu commandes comme un vrai Parisien"
+        )
+        is_valid, reason = self.service.validate_doctored_script(script_abrupt, finish_reason="STOP", vtype="roleplay")
+        self.assertFalse(is_valid)
+        self.assertIn("abruptly mid-sentence", reason)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
