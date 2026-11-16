@@ -60,5 +60,38 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
-export type ActiveTab = 'script_auditor' | 'description_creation';
+export type ActiveTab = 'script_auditor' | 'description_creation' | 'id_checklist';
+
+export type MatrixStatus = 'grey' | 'yellow' | 'green';
+
+export interface MatrixItem {
+  id: string;
+  script_ready: boolean;
+  video_ready: boolean;
+  expression: string;
+  script_date: string;
+  has_script_changed: boolean;
+  has_short_description: boolean;
+  status: MatrixStatus;
+}
+
+export interface MatrixCategoryData {
+  language: string;
+  video_type: string;
+  sheet_url?: string;
+  count: number;
+  items: MatrixItem[];
+}
+
+export interface BatchUpdateReadyItem {
+  id: string;
+  script_ready: boolean;
+  script_date?: string;
+}
+
+export interface BatchUpdateReadyPayload {
+  language: string;
+  video_type: string;
+  updates: BatchUpdateReadyItem[];
+}
 

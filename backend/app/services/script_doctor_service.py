@@ -12,6 +12,7 @@ import requests
 
 from ..core.config import settings
 from ..core.routing import parse_and_route_id, ParsedId
+from .gemini_auditor import gemini_auditor, GeminiAuditor, GeminiAuditorError
 
 logger = logging.getLogger(__name__)
 
@@ -158,29 +159,9 @@ class ScriptDoctorService:
 
     def validate_doctored_script(self, text: str, finish_reason: str = "STOP", vtype: str = "") -> Tuple[bool, str]:
         """
-        Validates the doctored script for completeness and lack of truncation.
+        Validates the doctored script for completeness and lack of truncation via the centralized auditor.
         """
-        if not text or not text.strip():
-            return False, "Script output is empty"
-
-        clean = text.strip()
-
-        if finish_reason == "MAX_TOKENS":
-            return False, "Response was truncated by token limit (finishReason=MAX_TOKENS)"
-        if finish_reason in ("SAFETY", "RECITATION", "OTHER"):
-            return False, f"Response was prematurely stopped by API (finishReason={finish_reason})"
-
-        words = clean.split()
-        min_words = 80 if vtype == "roleplay" else 50
-        if len(words) < min_words:
-            return False, f"Script output is too short ({len(words)} words; expected >= {min_words})"
-
-        # Clean terminal punctuation check
-        last_char = clean[-1]
-        if last_char not in ('.', '!', '?', '"', "'", ')'):
-            return False, f"Script terminated abruptly mid-sentence (ends with: '{clean[-25:]}')"
-
-        return True, "Valid"
+        return gemini_auditor.audit_script(text, finish_reason, vtype)
 
     def doctor_script(
         self,
@@ -190,7 +171,8 @@ class ScriptDoctorService:
     ) -> Dict[str, Any]:
         """
         Rewrites/doctors a script completely using Gemini, applying format-specific rules,
-        anti-repetition safeguards, and out-of-the-box narrative creativity with auto-retry resilience.
+        anti-repetition safeguards, and out-of-the-box narrative creativity routed through GeminiAuditor
+        with multi-model fallback, 3 retry attempts, token-truncation protection, and post-audit validation.
         """
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not configured in .env.")
@@ -226,95 +208,37 @@ Raw Draft Script:
 Instruction:
 Completely doctor and elevate this script into a fresh, out-of-the-box narrative that strictly adheres to the format structure, word budget, and linguistic authenticity rules. Deliver ONLY the clean, production-ready script text."""
 
-        endpoint = f"{self.base_url}/{self.model}:generateContent?key={self.api_key}"
+        auditor = GeminiAuditor(
+            api_key=self.api_key,
+            primary_model=self.model,
+            fallback_models=settings.gemini_fallback_models,
+            base_url=self.base_url
+        )
 
-        max_retries = 3
-        backoff_seconds = 1.0
-        last_error = ""
+        def script_validator(clean_text: str, finish_reason: str) -> Tuple[bool, str]:
+            return self.validate_doctored_script(clean_text, finish_reason, vtype)
 
-        for attempt in range(1, max_retries + 1):
-            current_temp = round(0.82 + ((attempt - 1) * 0.04), 2)
-            payload = {
-                "system_instruction": {
-                    "parts": [{"text": system_prompt}]
-                },
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": user_prompt}]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": current_temp,
-                    "maxOutputTokens": 1200  # Ceiling to guarantee complete multi-block scripts
-                }
-            }
+        try:
+            clean_script, finish_reason, used_model = auditor.execute_with_audit(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                validator_fn=script_validator,
+                script_id=parsed.canonical_id,
+                max_output_tokens=settings.gemini_max_output_tokens,
+                max_attempts_per_model=settings.gemini_max_retries_per_model,
+                timeout=settings.request_timeout
+            )
+        except GeminiAuditorError as e:
+            raise RuntimeError(str(e)) from e
 
-            try:
-                resp = requests.post(
-                    endpoint,
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                    timeout=settings.request_timeout
-                )
-            except requests.exceptions.RequestException as e:
-                last_error = f"Network connection error: {e}"
-                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} connection error: {last_error}")
-                if attempt < max_retries:
-                    time.sleep(backoff_seconds * (2 ** (attempt - 1)))
-                    continue
-                raise ConnectionError(f"Network error communicating with Gemini API after {max_retries} attempts: {e}")
+        word_count = len(clean_script.split())
 
-            if resp.status_code != 200:
-                err_msg = resp.text
-                try:
-                    err_msg = resp.json().get("error", {}).get("message", resp.text)
-                except Exception:
-                    pass
-
-                last_error = f"HTTP {resp.status_code}: {err_msg}"
-                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} API error: {last_error}")
-
-                if attempt < max_retries and resp.status_code in (429, 500, 502, 503, 504):
-                    time.sleep(backoff_seconds * (2 ** (attempt - 1)))
-                    continue
-
-                raise RuntimeError(f"Gemini API Error (HTTP {resp.status_code}): {err_msg}")
-
-            data = resp.json()
-            try:
-                raw_text, finish_reason = self._extract_text_and_finish_reason(data)
-            except RuntimeError as e:
-                last_error = str(e)
-                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} extraction error: {last_error}")
-                if attempt < max_retries:
-                    time.sleep(backoff_seconds)
-                    continue
-                raise
-
-            doctored_script = self._clean_script_output(raw_text)
-
-            is_valid, check_reason = self.validate_doctored_script(doctored_script, finish_reason, vtype)
-            if not is_valid:
-                last_error = f"Validation failed ({check_reason})"
-                logger.warning(f"[{parsed.canonical_id}] Attempt {attempt}/{max_retries} invalid: {last_error}")
-                if attempt < max_retries:
-                    time.sleep(backoff_seconds)
-                    continue
-                raise RuntimeError(
-                    f"Gemini generated invalid/incomplete script after {max_retries} attempts: {check_reason}"
-                )
-
-            word_count = len(doctored_script.split())
-
-            return {
-                "script_id": parsed.canonical_id,
-                "expression": expression,
-                "doctored_script": doctored_script,
-                "word_count": word_count
-            }
-
-        raise RuntimeError(f"Gemini script doctoring failed after {max_retries} attempts: {last_error}")
+        return {
+            "script_id": parsed.canonical_id,
+            "expression": expression,
+            "doctored_script": clean_script,
+            "word_count": word_count
+        }
 
     def _extract_text_and_finish_reason(self, data: Dict[str, Any]) -> Tuple[str, str]:
         candidates = data.get("candidates", [])
@@ -332,17 +256,8 @@ Completely doctor and elevate this script into a fresh, out-of-the-box narrative
         return text
 
     def _clean_script_output(self, text: str) -> str:
-        s = text.strip()
-        # Remove markdown code block fences ```text ... ``` or ``` ... ```
-        s = re.sub(r"^```[a-zA-Z]*\n?", "", s)
-        s = re.sub(r"\n?```$", "", s)
-        # Remove meta intros like "Here is the doctored script:"
-        s = re.sub(r"^(Here is the (doctored|revised|polished|new) script[:\s-]*)\n?", "", s, flags=re.IGNORECASE)
-        # Strictly remove [CHALKBOARD_EXERCISE] and any graphic cards after it
-        s = re.sub(r"\n*\[CHALKBOARD_EXERCISE\][\s\S]*$", "", s, flags=re.IGNORECASE)
-        # Remove trailing word count labels if model appended "Word Count: 102 words"
-        s = re.sub(r"\n+Word Count:\s*\d+.*$", "", s, flags=re.IGNORECASE)
-        return s.strip()
+        """Delegates deep cleaning and artifact removal to GeminiAuditor."""
+        return gemini_auditor.sanitize_output(text)
 
 
 # Shared singleton instance

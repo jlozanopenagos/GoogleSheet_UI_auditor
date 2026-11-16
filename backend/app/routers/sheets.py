@@ -12,6 +12,8 @@ from ..models.schemas import (
     ScriptRecord,
     UpdateScriptRequest,
     UpdateDescriptionRequest,
+    BatchUpdateReadyRequest,
+    MatrixCategoryResponse,
     ApiResponse
 )
 from ..core.routing import IdRoutingError
@@ -102,5 +104,53 @@ def update_description(
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         logger.exception(f"Unexpected error updating description {script_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.get("/matrix/{language}/{video_type}", response_model=ApiResponse)
+def get_matrix_category(
+    language: str = Path(..., description="Language e.g. english, french, spanish, italian"),
+    video_type: str = Path(..., description="Video type e.g. expression, game, roleplay, fun_facts")
+) -> ApiResponse:
+    """Fetches lightweight ID checklist matrix for a given language and video type."""
+    try:
+        data = sheet_service.fetch_matrix_category(language, video_type)
+        return ApiResponse(
+            success=True,
+            message=f"Matrix for {language.capitalize()} {video_type.capitalize()} loaded successfully.",
+            data=data
+        )
+    except IdRoutingError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except SheetServiceError as e:
+        logger.error(f"Sheet matrix error for {language} {video_type}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Unexpected error fetching matrix {language} {video_type}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.post("/matrix/batch-update-ready", response_model=ApiResponse)
+def batch_update_ready(payload: BatchUpdateReadyRequest) -> ApiResponse:
+    """Updates ready status for multiple IDs in a single batch Google Sheet operation."""
+    try:
+        raw_updates = [item.model_dump() for item in payload.updates]
+        result = sheet_service.batch_update_ready_items(
+            language=payload.language,
+            video_type=payload.video_type,
+            updates=raw_updates
+        )
+        return ApiResponse(
+            success=True,
+            message=f"Successfully batch updated {len(raw_updates)} items in Google Sheet.",
+            data=result
+        )
+    except IdRoutingError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except SheetServiceError as e:
+        logger.error(f"Batch update error for {payload.language} {payload.video_type}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Unexpected error in batch ready update: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 

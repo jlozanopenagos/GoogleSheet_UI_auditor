@@ -4,6 +4,7 @@ import { IdSearchBar } from './components/IdSearchBar';
 import { NotificationToast } from './components/NotificationToast';
 import { ScriptAuditorView } from './views/ScriptAuditorView';
 import { DescriptionCreationView } from './views/DescriptionCreationView';
+import { IdChecklistView } from './views/IdChecklistView';
 import { ActiveTab, ScriptRecord } from './types';
 import { fetchScriptById } from './services/api';
 
@@ -36,6 +37,11 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSelectIdFromMatrix = async (id: string, targetTab?: ActiveTab) => {
+    setActiveTab(targetTab || 'script_auditor');
+    await handleSearch(id);
+  };
+
   const handleScriptUpdated = (updated: ScriptRecord) => {
     setCurrentScript(updated);
   };
@@ -50,7 +56,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-brand-dark flex flex-col text-brand-ice">
-      {/* Top Application Header */}
+      {/* Top Application Header with Modular Navigation */}
       <Header
         activeTab={activeTab}
         onTabChange={(tab) => {
@@ -62,12 +68,14 @@ export const App: React.FC = () => {
 
       {/* Main Content Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
-        {/* Universal ID Search Bar (DRY: Shared for both Tab 1 and Tab 2) */}
-        <IdSearchBar
-          onSearch={handleSearch}
-          isLoading={isLoading}
-          activeId={currentScript?.ID}
-        />
+        {/* Universal ID Search Bar: shown on Script Auditor & Description Creator tabs */}
+        {activeTab !== 'id_checklist' && (
+          <IdSearchBar
+            onSearch={handleSearch}
+            isLoading={isLoading}
+            activeId={currentScript?.ID}
+          />
+        )}
 
         {/* Global Notifications */}
         {notification && (
@@ -79,17 +87,27 @@ export const App: React.FC = () => {
         )}
 
         {/* Dynamic Tab Views */}
-        {activeTab === 'script_auditor' ? (
+        {activeTab === 'script_auditor' && (
           <ScriptAuditorView
             script={currentScript}
             onScriptUpdated={handleScriptUpdated}
             onError={handleError}
             onSuccess={handleSuccess}
           />
-        ) : (
+        )}
+
+        {activeTab === 'description_creation' && (
           <DescriptionCreationView
             script={currentScript}
             onScriptUpdated={handleScriptUpdated}
+            onError={handleError}
+            onSuccess={handleSuccess}
+          />
+        )}
+
+        {activeTab === 'id_checklist' && (
+          <IdChecklistView
+            onSelectId={handleSelectIdFromMatrix}
             onError={handleError}
             onSuccess={handleSuccess}
           />
@@ -105,4 +123,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

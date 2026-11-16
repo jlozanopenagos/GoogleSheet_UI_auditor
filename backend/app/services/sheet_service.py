@@ -10,8 +10,8 @@ import time
 from typing import Dict, Any, Optional, List
 import requests
 
-from ..core.config import settings
-from ..core.routing import parse_and_route_id, ParsedId
+from ..core.config import settings, ENDPOINT_REGISTRY, extract_spreadsheet_id, extract_gid
+from ..core.routing import parse_and_route_id, ParsedId, IdRoutingError
 from ..models.schemas import ScriptRecord
 
 logger = logging.getLogger(__name__)
@@ -158,6 +158,117 @@ class SheetService:
                 "Google Sheet returned 'count: 0'. The Google Apps Script deployed in your Google Sheet is still running the old placeholder code! "
                 "Please deploy the updated Code.gs in Google Sheets (Extensions > Apps Script > Deploy > New version)."
             )
+
+        return res
+
+    def fetch_matrix_category(self, language: str, video_type: str) -> Dict[str, Any]:
+        """
+        Fetches all records for a given language and video type, returning a lightweight list of matrix items.
+        """
+        lang_clean = language.strip().lower()
+        vtype_clean = video_type.strip().lower()
+        endpoint_url = ENDPOINT_REGISTRY.get((lang_clean, vtype_clean), "")
+        if not endpoint_url:
+            raise IdRoutingError(
+                f"No Google Sheet endpoint configured for {language.capitalize()} {video_type.replace('_', ' ').capitalize()}."
+            )
+
+        spreadsheet_id = extract_spreadsheet_id(endpoint_url)
+        gid = extract_gid(endpoint_url)
+
+        query_url = f"{self.master_url}?id={spreadsheet_id}"
+        if gid:
+            query_url += f"&gid={gid}"
+
+        logger.info(f"Fetching matrix for {lang_clean} {vtype_clean} from {spreadsheet_id}")
+        data = self._http_get(query_url)
+        records = data.get("data", [])
+        if not isinstance(records, list):
+            raise SheetServiceError(f"Unexpected data format returned from Google Sheet: {data}")
+
+        items = []
+        for r in records:
+            raw_id = str(r.get("ID") or r.get("id") or "").strip().upper()
+            if not raw_id:
+                continue
+            script_changed = str(r.get("SCRIPT_CHANGED") or r.get("new_script") or "").strip()
+            short_desc = str(r.get("short_description") or r.get("description") or "").strip()
+
+            has_script_changed = bool(script_changed)
+            has_short_description = bool(short_desc)
+
+            # Three-state logic:
+            # - Grey: Column D (SCRIPT_CHANGED) is empty
+            # - Yellow: Column D is filled, but Column I (short_description) is empty
+            # - Green: Column D is filled AND Column I is filled
+            if has_script_changed and has_short_description:
+                status = "green"
+            elif has_script_changed:
+                status = "yellow"
+            else:
+                status = "grey"
+
+            items.append({
+                "id": raw_id,
+                "script_ready": bool(r.get("script_ready") is True or r.get("script_ready") == "true"),
+                "video_ready": bool(r.get("video_ready") is True or r.get("video_ready") == "true"),
+                "expression": str(r.get("expression") or r.get("topic") or r.get("subject") or "").strip(),
+                "script_date": str(r.get("script_date") or "").strip(),
+                "has_script_changed": has_script_changed,
+                "has_short_description": has_short_description,
+                "status": status
+            })
+
+        return {
+            "language": lang_clean,
+            "video_type": vtype_clean,
+            "sheet_url": endpoint_url,
+            "count": len(items),
+            "items": items
+        }
+
+    def batch_update_ready_items(
+        self,
+        language: str,
+        video_type: str,
+        updates: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Batch updates script_ready checkbox (and optional script_date) for multiple IDs in a sheet.
+        """
+        lang_clean = language.strip().lower()
+        vtype_clean = video_type.strip().lower()
+        endpoint_url = ENDPOINT_REGISTRY.get((lang_clean, vtype_clean), "")
+        if not endpoint_url:
+            raise IdRoutingError(
+                f"No Google Sheet endpoint configured for {language.capitalize()} {video_type.replace('_', ' ').capitalize()}."
+            )
+
+        spreadsheet_id = extract_spreadsheet_id(endpoint_url)
+        gid = extract_gid(endpoint_url)
+
+        rows_payload = []
+        for u in updates:
+            row_dict: Dict[str, Any] = {
+                "id": str(u.get("id", "")).strip().upper(),
+                "script_ready": bool(u.get("script_ready"))
+            }
+            if u.get("script_date"):
+                row_dict["script_date"] = str(u.get("script_date")).strip()
+            rows_payload.append(row_dict)
+
+        payload = {
+            "action": "batch_update",
+            "spreadsheet_id": spreadsheet_id,
+            "gid": gid,
+            "rows": rows_payload
+        }
+
+        logger.info(f"Batch updating {len(rows_payload)} rows in {spreadsheet_id} (gid={gid})")
+        res = self._http_post(self.master_url, payload)
+
+        if res.get("status") == "error":
+            raise SheetServiceError(f"Google Sheet error: {res.get('message', 'Unknown error')}")
 
         return res
 

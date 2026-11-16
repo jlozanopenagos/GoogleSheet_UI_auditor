@@ -1,6 +1,7 @@
 import React from 'react';
-import { FileEdit, Sparkles, Sheet, ExternalLink } from 'lucide-react';
+import { Sheet, ExternalLink } from 'lucide-react';
 import { ActiveTab, ScriptRecord } from '../types';
+import { NavigationTabs } from './NavigationTabs';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -29,36 +30,13 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, currentS
               <span>GoogleSheet UI Auditor</span>
             </h1>
             <p className="text-xs text-brand-ice/70 font-medium">
-              Multi-language scripts and YouTube Shorts SEO studio
+              Multi-language scripts, ID Checklist and YouTube Shorts SEO studio
             </p>
           </div>
         </div>
 
-        {/* Tab Navigation Controls */}
-        <div className="flex items-center gap-1.5 bg-brand-dark/90 p-1.5 rounded-2xl border border-brand-border shadow-inner">
-          <button
-            onClick={() => onTabChange('script_auditor')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'script_auditor'
-                ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry text-white shadow-md shadow-brand-sky/20'
-                : 'text-slate-300 hover:text-white hover:bg-brand-surface/80'
-            }`}
-          >
-            <FileEdit className="w-4 h-4" />
-            <span>Script auditor</span>
-          </button>
-          <button
-            onClick={() => onTabChange('description_creation')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'description_creation'
-                ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry text-white shadow-md shadow-brand-sky/20'
-                : 'text-slate-300 hover:text-white hover:bg-brand-surface/80'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Description creator</span>
-          </button>
-        </div>
+        {/* Tab Navigation Controls (Modular Component) */}
+        <NavigationTabs activeTab={activeTab} onTabChange={onTabChange} />
 
         {/* Current Active Sheet Link */}
         {currentScript?.sheet_url && (
@@ -77,4 +55,3 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, onTabChange, currentS
     </header>
   );
 };
-

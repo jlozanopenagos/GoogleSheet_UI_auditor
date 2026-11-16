@@ -23,6 +23,8 @@ from app.services.sheet_service import SheetService, ScriptNotFoundError
 # pyrefly: ignore[missing-import]
 from app.services.gemini_service import GeminiService, GeminiServiceError, gemini_service
 # pyrefly: ignore[missing-import]
+from app.services.gemini_auditor import GeminiAuditor, GeminiAuditorError, gemini_auditor
+# pyrefly: ignore[missing-import]
 from app.services.script_doctor_service import (
     ScriptDoctorService,
     ROLEPLAY_SYSTEM_PROMPT,
@@ -139,6 +141,83 @@ class TestSheetService(unittest.TestCase):
         with self.assertRaises(ScriptNotFoundError):
             service.fetch_script_by_id("EE01")
 
+    @patch.object(SheetService, "_http_get")
+    def test_fetch_matrix_category_success(self, mock_get):
+        mock_get.return_value = {
+            "status": "success",
+            "count": 3,
+            "data": [
+                {
+                    "ID": "EE01",
+                    "expression": "Break a leg",
+                    "script": "Old script",
+                    "SCRIPT_CHANGED": "New script",
+                    "short_description": "Great description #Shorts",
+                    "script_ready": True,
+                    "script_date": "31/01/26"
+                },
+                {
+                    "ID": "EE02",
+                    "expression": "Bite the bullet",
+                    "script": "Old script",
+                    "SCRIPT_CHANGED": "Doctored script",
+                    "short_description": "",
+                    "script_ready": False
+                },
+                {
+                    "ID": "EE03",
+                    "expression": "Piece of cake",
+                    "script": "Old script",
+                    "SCRIPT_CHANGED": "",
+                    "short_description": "",
+                    "script_ready": False
+                }
+            ]
+        }
+
+        service = SheetService()
+        result = service.fetch_matrix_category("english", "expression")
+
+        self.assertEqual(result["language"], "english")
+        self.assertEqual(result["video_type"], "expression")
+        self.assertEqual(result["count"], 3)
+        # EE01: Green (Col D filled AND Col I filled)
+        self.assertEqual(result["items"][0]["id"], "EE01")
+        self.assertTrue(result["items"][0]["has_script_changed"])
+        self.assertTrue(result["items"][0]["has_short_description"])
+        self.assertEqual(result["items"][0]["status"], "green")
+        # EE02: Yellow (Col D filled, Col I empty)
+        self.assertEqual(result["items"][1]["id"], "EE02")
+        self.assertTrue(result["items"][1]["has_script_changed"])
+        self.assertFalse(result["items"][1]["has_short_description"])
+        self.assertEqual(result["items"][1]["status"], "yellow")
+        # EE03: Grey (Col D empty)
+        self.assertEqual(result["items"][2]["id"], "EE03")
+        self.assertFalse(result["items"][2]["has_script_changed"])
+        self.assertFalse(result["items"][2]["has_short_description"])
+        self.assertEqual(result["items"][2]["status"], "grey")
+
+    @patch.object(SheetService, "_http_post")
+    def test_batch_update_ready_items_success(self, mock_post):
+        mock_post.return_value = {
+            "status": "success",
+            "updated_count": 2,
+            "total": 2
+        }
+
+        service = SheetService()
+        result = service.batch_update_ready_items(
+            language="english",
+            video_type="expression",
+            updates=[
+                {"id": "EE01", "script_ready": True},
+                {"id": "EE02", "script_ready": False}
+            ]
+        )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["updated_count"], 2)
+
 
 class TestFastApiEndpoints(unittest.TestCase):
     def setUp(self):
@@ -197,6 +276,66 @@ class TestFastApiEndpoints(unittest.TestCase):
         self.assertTrue(body["success"])
         self.assertEqual(body["data"]["script_id"], "EF01")
         self.assertIn("knights", body["data"]["doctored_script"])
+
+    @patch.object(SheetService, "fetch_matrix_category")
+    def test_get_matrix_endpoint_success(self, mock_matrix):
+        mock_matrix.return_value = {
+            "language": "english",
+            "video_type": "expression",
+            "sheet_url": "https://docs.google.com/test",
+            "count": 2,
+            "items": [
+                {
+                    "id": "EE01",
+                    "script_ready": True,
+                    "video_ready": False,
+                    "expression": "Break a leg",
+                    "script_date": "31/01/26",
+                    "has_script_changed": True
+                },
+                {
+                    "id": "EE02",
+                    "script_ready": False,
+                    "video_ready": False,
+                    "expression": "Bite the bullet",
+                    "script_date": "",
+                    "has_script_changed": False
+                }
+            ]
+        }
+
+        resp = self.client.get("/api/sheets/matrix/english/expression")
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["data"]["count"], 2)
+        self.assertEqual(body["data"]["items"][0]["id"], "EE01")
+        self.assertTrue(body["data"]["items"][0]["script_ready"])
+
+    def test_get_matrix_endpoint_invalid_category(self):
+        resp = self.client.get("/api/sheets/matrix/klingon/expression")
+        self.assertEqual(resp.status_code, 400)
+
+    @patch.object(SheetService, "batch_update_ready_items")
+    def test_batch_update_ready_endpoint_success(self, mock_batch):
+        mock_batch.return_value = {
+            "status": "success",
+            "updated_count": 2,
+            "total": 2
+        }
+
+        resp = self.client.post("/api/sheets/matrix/batch-update-ready", json={
+            "language": "english",
+            "video_type": "expression",
+            "updates": [
+                {"id": "EE01", "script_ready": True},
+                {"id": "EE02", "script_ready": True}
+            ]
+        })
+        self.assertEqual(resp.status_code, 200)
+        body = resp.json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["data"]["updated_count"], 2)
 
 
 class TestScriptDoctorService(unittest.TestCase):
@@ -439,6 +578,241 @@ class TestScriptDoctorValidation(unittest.TestCase):
         is_valid, reason = self.service.validate_doctored_script(script_abrupt, finish_reason="STOP", vtype="roleplay")
         self.assertFalse(is_valid)
         self.assertIn("abruptly mid-sentence", reason)
+
+
+class TestGeminiAuditorCore(unittest.TestCase):
+    def setUp(self):
+        self.auditor = GeminiAuditor(
+            api_key="mock_key",
+            primary_model="gemini-3.5-flash-lite",
+            fallback_models=["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+        )
+
+    def test_get_model_chain_deduplication(self):
+        chain = self.auditor.get_model_chain()
+        self.assertEqual(chain, ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.1-flash-lite"])
+
+    def test_sanitize_output_multilingual_intros(self):
+        cases = [
+            ("Here is the description:\nActual text.", "Actual text."),
+            ("Voici la description :\nTexte réel.", "Texte réel."),
+            ("Voilà la version :\nTexte réel.", "Texte réel."),
+            ("Aquí está la descripción:\nTexto real.", "Texto real."),
+            ("Ecco la descrizione:\nTesto reale.", "Testo reale."),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                cleaned = self.auditor.sanitize_output(raw)
+                self.assertEqual(cleaned, expected)
+
+    def test_sanitize_output_bracketed_and_bold_labels(self):
+        raw = (
+            "[Hook] You thought asking for water in Paris was easy.\n\n"
+            "**Challenge:** Which phrase is authentic?\n\n"
+            "**Pressure:** Three seconds to lock in your answer!\n\n"
+            "[Paragraph 4 - Answer Reveal] Option A is correct.\n\n"
+            "**Explanation & Social Takeaway:** Never pay tourist prices again."
+        )
+        cleaned = self.auditor.sanitize_output(raw)
+        self.assertNotIn("[Hook]", cleaned)
+        self.assertNotIn("**Challenge:**", cleaned)
+        self.assertNotIn("**Pressure:**", cleaned)
+        self.assertNotIn("[Paragraph 4 - Answer Reveal]", cleaned)
+        self.assertNotIn("**Explanation & Social Takeaway:**", cleaned)
+        self.assertIn("You thought asking for water", cleaned)
+        self.assertIn("Which phrase is authentic?", cleaned)
+
+    def test_sanitize_output_code_fences_and_word_counts(self):
+        raw = "```markdown\nThis is the real script line.\n\nWord Count: 42 words\n```"
+        cleaned = self.auditor.sanitize_output(raw)
+        self.assertEqual(cleaned, "This is the real script line.")
+
+    def test_audit_description_valid(self):
+        desc = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+            "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story below! 👇\n\n"
+            "#Shorts #LearnItalian #ItalianTips"
+        )
+        is_valid, reason = self.auditor.audit_description(desc, finish_reason="STOP")
+        self.assertTrue(is_valid)
+        self.assertEqual(reason, "Valid")
+
+    def test_audit_description_rejection_max_tokens(self):
+        is_valid, reason = self.auditor.audit_description("Some text...", finish_reason="MAX_TOKENS")
+        self.assertFalse(is_valid)
+        self.assertIn("MAX_TOKENS", reason)
+
+    def test_audit_description_rejection_no_hashtags(self):
+        desc = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double-consonant secret native Italians use to get it right every single time."
+        )
+        is_valid, reason = self.auditor.audit_description(desc, finish_reason="STOP")
+        self.assertFalse(is_valid)
+        self.assertIn("missing discovery hashtags", reason)
+
+
+class TestGeminiAuditorExecutionAndFallback(unittest.TestCase):
+    def setUp(self):
+        self.auditor = GeminiAuditor(
+            api_key="mock_key",
+            primary_model="gemini-2.5-flash",
+            fallback_models=["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+        )
+
+    @patch("time.sleep", return_value=None)
+    @patch("requests.post")
+    def test_primary_model_404_cascades_to_fallback(self, mock_post, mock_sleep):
+        # Primary model (gemini-2.5-flash) returns 404 (model retired)
+        mock_404 = MagicMock(status_code=404, text='{"error":{"message":"Model not found"}}')
+        mock_404.json.return_value = {"error": {"message": "Model not found"}}
+
+        # Backup model (gemini-3.5-flash-lite) returns 200 OK
+        valid_desc = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+            "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story below! 👇\n\n"
+            "#Shorts #LearnItalian #ItalianTips"
+        )
+        mock_200 = MagicMock(status_code=200)
+        mock_200.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": valid_desc}]},
+                    "finishReason": "STOP"
+                }
+            ]
+        }
+
+        mock_post.side_effect = [mock_404, mock_200]
+
+        clean_text, finish_reason, model_used = self.auditor.execute_with_audit(
+            system_prompt="system",
+            user_prompt="user",
+            validator_fn=self.auditor.audit_description,
+            script_id="IE01"
+        )
+
+        self.assertEqual(model_used, "gemini-3.5-flash-lite")
+        self.assertIn("#LearnItalian", clean_text)
+        self.assertEqual(finish_reason, "STOP")
+        # 1 call to 2.5-flash (breaks immediately on 404), 1 call to 3.5-flash-lite
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch("time.sleep", return_value=None)
+    @patch("requests.post")
+    def test_multi_attempt_retry_loop_on_invalid_output(self, mock_post, mock_sleep):
+        # Attempt 1: output is missing hashtags (auditor rejects)
+        mock_attempt1 = MagicMock(status_code=200)
+        mock_attempt1.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "You order espresso at a bustling Milan cafe without any hashtags."}]},
+                    "finishReason": "STOP"
+                }
+            ]
+        }
+
+        # Attempt 2: valid complete output with hashtags
+        valid_desc = (
+            "You order espresso at a bustling Milan cafe, but one wrong consonant turns your request into sheer comedy! ☕\n\n"
+            "Watch what happens when the barista stares in total confusion. Stick around until the end to discover "
+            "the subtle acoustic double-consonant secret native Italians use to get it right every single time.\n\n"
+            "Have you ever had an embarrassing pronunciation slip in Italy? Drop your story below! 👇\n\n"
+            "#Shorts #LearnItalian #ItalianTips"
+        )
+        mock_attempt2 = MagicMock(status_code=200)
+        mock_attempt2.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": valid_desc}]},
+                    "finishReason": "STOP"
+                }
+            ]
+        }
+
+        mock_post.side_effect = [mock_attempt1, mock_attempt2]
+
+        clean_text, finish_reason, model_used = self.auditor.execute_with_audit(
+            system_prompt="system",
+            user_prompt="user",
+            validator_fn=self.auditor.audit_description,
+            script_id="IE01"
+        )
+
+        self.assertEqual(model_used, "gemini-2.5-flash")
+        self.assertIn("#LearnItalian", clean_text)
+        self.assertEqual(mock_post.call_count, 2)
+
+    @patch("time.sleep", return_value=None)
+    @patch("requests.post")
+    def test_all_models_fail_raises_gemini_auditor_error(self, mock_post, mock_sleep):
+        mock_404 = MagicMock(status_code=404, text='{"error":{"message":"Model not found"}}')
+        mock_404.json.return_value = {"error": {"message": "Model not found"}}
+
+        # All 3 models return 404
+        mock_post.side_effect = [mock_404, mock_404, mock_404]
+
+        with self.assertRaises(GeminiAuditorError):
+            self.auditor.execute_with_audit(
+                system_prompt="system",
+                user_prompt="user",
+                validator_fn=self.auditor.audit_description,
+                script_id="IE01"
+            )
+
+
+class TestScriptDoctorAuditorIntegration(unittest.TestCase):
+    @patch("time.sleep", return_value=None)
+    @patch("requests.post")
+    def test_doctor_script_retry_and_sanitize_success(self, mock_post, mock_sleep):
+        service = ScriptDoctorService(api_key="mock_key", model="gemini-3.5-flash-lite")
+
+        raw_script_output = (
+            "```text\n"
+            "Here is the doctored script:\n"
+            "**Paragraph 1 (Hook):** You thought asking for a glass of tap water in Paris was easy.\n\n"
+            "PERSON_ONE (hesitant): Excusez-moi, est-ce que je peux avoir de l'eau s'il vous plaît?\n"
+            "PERSON_TWO (smirking): De l'eau en bouteille à dix euros ou une carafe gratuite?\n\n"
+            "PERSON_ONE (shocked): Attends, il y a un mot magique pour ne pas payer dix euros?\n"
+            "PERSON_TWO (confident): Une carafe d'eau. C'est la loi, c'est gratuit et c'est parfait.\n\n"
+            "PERSON_ONE (relieved): Une carafe d'eau fraîche, s'il vous plaît!\n"
+            "PERSON_TWO (approving): Voilà, maintenant tu commandes comme un vrai Parisien!\n\n"
+            "Narrator: Never pay tourist prices for tap water again. Drop your best French travel tip below!\n"
+            "Word Count: 105 words\n"
+            "```"
+        )
+
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": raw_script_output}]},
+                    "finishReason": "STOP"
+                }
+            ]
+        }
+
+        mock_post.return_value = mock_resp
+
+        result = service.doctor_script(
+            script_id="FR01",
+            expression="Carafe d'eau",
+            original_script="Draft about water in Paris"
+        )
+
+        self.assertEqual(result["script_id"], "FR01")
+        self.assertNotIn("```", result["doctored_script"])
+        self.assertNotIn("Here is the doctored script:", result["doctored_script"])
+        self.assertNotIn("**Paragraph 1 (Hook):**", result["doctored_script"])
+        self.assertNotIn("Word Count:", result["doctored_script"])
+        self.assertIn("PERSON_ONE", result["doctored_script"])
+        self.assertIn("PERSON_TWO", result["doctored_script"])
+        self.assertTrue(result["word_count"] > 70)
 
 
 if __name__ == "__main__":

@@ -34,7 +34,15 @@ class Settings(BaseModel):
 
     # Gemini API Settings
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    gemini_fallback_models: list[str] = [
+        m.strip() for m in os.getenv(
+            "GEMINI_FALLBACK_MODELS",
+            "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-flash-lite-latest"
+        ).split(",") if m.strip()
+    ]
+    gemini_max_output_tokens: int = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "2500"))
+    gemini_max_retries_per_model: int = int(os.getenv("GEMINI_MAX_RETRIES_PER_MODEL", "3"))
 
     # Request timeouts & retries
     request_timeout: int = 35

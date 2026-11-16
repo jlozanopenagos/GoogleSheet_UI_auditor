@@ -6,6 +6,8 @@ import {
   GeminiGenerateResult,
   DoctorScriptPayload,
   DoctorScriptResult,
+  MatrixCategoryData,
+  BatchUpdateReadyPayload,
   ApiResponse,
 } from '../types';
 
@@ -83,3 +85,28 @@ export async function doctorScriptWithGemini(payload: DoctorScriptPayload): Prom
   return json.data;
 }
 
+export async function fetchMatrixCategory(language: string, videoType: string): Promise<MatrixCategoryData> {
+  const resp = await fetch(`${API_BASE}/sheets/matrix/${encodeURIComponent(language.toLowerCase())}/${encodeURIComponent(videoType.toLowerCase())}`);
+  const json: ApiResponse<MatrixCategoryData> = await resp.json();
+
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.message || json.error || `Failed to fetch matrix for ${language} ${videoType}.`);
+  }
+
+  return json.data;
+}
+
+export async function batchUpdateReady(payload: BatchUpdateReadyPayload): Promise<any> {
+  const resp = await fetch(`${API_BASE}/sheets/matrix/batch-update-ready`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse = await resp.json();
+  if (!resp.ok || !json.success) {
+    throw new Error(json.message || json.error || 'Failed to update ready state in Google Sheet.');
+  }
+
+  return json.data;
+}

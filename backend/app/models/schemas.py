@@ -57,6 +57,37 @@ class GeminiGenerateResponse(BaseModel):
     hashtags: List[str] = Field(default_factory=list)
 
 
+class MatrixItem(BaseModel):
+    id: str
+    script_ready: bool = False
+    video_ready: bool = False
+    expression: str = ""
+    script_date: str = ""
+    has_script_changed: bool = False
+    has_short_description: bool = False
+    status: str = "grey"  # "grey" | "yellow" | "green"
+
+
+class MatrixCategoryResponse(BaseModel):
+    language: str
+    video_type: str
+    sheet_url: Optional[str] = None
+    count: int = 0
+    items: List[MatrixItem] = Field(default_factory=list)
+
+
+class BatchUpdateReadyItem(BaseModel):
+    id: str
+    script_ready: bool
+    script_date: Optional[str] = ""
+
+
+class BatchUpdateReadyRequest(BaseModel):
+    language: str
+    video_type: str
+    updates: List[BatchUpdateReadyItem]
+
+
 class ApiResponse(BaseModel):
     success: bool
     message: str = ""
