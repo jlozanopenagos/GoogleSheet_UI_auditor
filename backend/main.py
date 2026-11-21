@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.routers.sheets import router as sheets_router
 from app.routers.gemini import router as gemini_router
+from app.routers.calendar import router as calendar_router
 
 app = FastAPI(
     title="GoogleSheet UI Auditor API",
@@ -37,6 +38,7 @@ app.add_middleware(
 # Mount API Routers
 app.include_router(sheets_router)
 app.include_router(gemini_router)
+app.include_router(calendar_router)
 
 
 @app.get("/api/health")

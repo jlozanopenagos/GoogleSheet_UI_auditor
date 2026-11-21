@@ -60,15 +60,17 @@ When the user submits an ID into the search bar:
 
 ## 4. Google Sheets Column Schema
 
-| Column Letter | Header Name in Sheet | Data Type | Tab 1 (Script Auditor) | Tab 2 (Description Creation) |
-| :---: | :--- | :---: | :---: | :---: |
-| **A** | `ID` | Text (`EE01`, `FG03`) | Row Key / Identification | Row Key / Identification |
-| **B** | `expression` | Text | Display label ("Editing X: Y") | Display label ("Editing X: Y") |
-| **C** | `script` | Text | Read-only (Left comparison box) | Contextual reference |
-| **D** | `SCRIPT_CHANGED` | Text | Editable (Right box) | Required Gemini Input |
-| **E** | `script_ready` | Checkbox (`TRUE`/`FALSE`) | Editable checkbox | - |
-| **F** | `script_date` | Date (`DD/MM/YY` e.g. `31/01/26`) | Editable date input | - |
-| **I** | `short_description` | Text | - | Read-only (Left) & Editable (Right) |
+| Column Letter | Header Name in Sheet | Data Type | Tab 1 (Script Auditor) | Tab 2 (Description Creation) | Tab 3 & 4 (Bingo / Launch Calendar) |
+| :---: | :--- | :---: | :---: | :---: | :---: |
+| **A** | `ID` | Text (`EE01`, `FG03`) | Row Key / Identification | Row Key / Identification | Matrix / Calendar Key |
+| **B** | `expression` | Text | Display label ("Editing X: Y") | Display label ("Editing X: Y") | Tooltip / Topic Label |
+| **C** | `script` | Text | Read-only (Left comparison box) | Contextual reference | - |
+| **D** | `SCRIPT_CHANGED` | Text | Editable (Right box) | Required Gemini Input | Yellow / Green / Calendar Gate |
+| **E** | `script_ready` | Checkbox (`TRUE`/`FALSE`) | Editable checkbox | - | Required Calendar Gate (auto-check option) |
+| **F** | `script_date` | Date (`DD/MM/YY` e.g. `31/01/26`) | Editable date input | - | Production ready date |
+| **G** | `video_ready` | Checkbox (`TRUE`/`FALSE`) | - | - | Launch Calendar sync (`TRUE` when launched) |
+| **H** | `video_date` | Date (`DD/MM/YY`) | - | - | Launch Calendar date (`DD/MM/YY`) |
+| **I** | `short_description` | Text | - | Read-only (Left) & Editable (Right) | Green / Calendar Gate |
 
 > [!IMPORTANT]
 > **Column I Auto-Initialization**: In sheets where Column I is currently unassigned or headerless, the system automatically writes `"short_description"` into row 1 of Column I upon initialization or first save.
@@ -106,6 +108,22 @@ When the user submits an ID into the search bar:
 - **When Gemini Generates Output**:
   - Displays the generated copy on the left (read-only) and in the editable right box.
   - User can polish text and click "Save Description" to push directly to Column I in the sheet.
+
+### Tab 3: "ID checklist" (4-State Bingo Matrix)
+- Displays all canonical IDs for the selected `(language, video_type)` across 4 states:
+  - **Violet (`violet`)**: Already scheduled on the YouTube Launch Calendar (with Column D + Column I ready).
+  - **Green (`green`)**: Script revision (Column D) + SEO Description (Column I) ready to launch.
+  - **Yellow (`yellow`)**: Script revision ready (Column D), needs SEO description (Column I).
+  - **Grey (`grey`)**: Script revision (Column D) empty.
+- Clicking a Green card exposes a **"Schedule in Calendar"** button; clicking a Violet card displays its launch date and a **"View in Calendar"** shortcut.
+
+### Tab 4: "Launch calendar" (Dynamic YouTube Launch Tracker)
+- Interactive monthly/weekly calendar tracking YouTube Shorts already launched or scheduled per language (`All` / `English` / `French` / `Spanish` / `Italian`).
+- **Readiness Gate**: Before adding an ID, verifies live Google Sheets state (`SCRIPT_CHANGED` in Col D, `script_ready` checkbox in Col E, and `short_description` in Col I). If Col D + Col I are ready while Col E is unchecked, provides a 1-click **"Check Column E & Add to Calendar"** shortcut; missing D or I routes straight to Tab 1 or Tab 2.
+- **Per-Language Daily Cadence Rules (Soft Warning + Override)**:
+  - **Fun Fact Day**: `1 FUN_FACTS` short per day per language.
+  - **Triad Day**: Up to `3` shorts per day per language (`1 EXPRESSION + 1 GAME + 1 ROLEPLAY`, flagging format duplicates or mixing Fun Facts unless overridden with `"Force schedule anyway"`).
+- **Persistence**: Saves launch records to `backend/data/launch_calendar.json` and syncs Column G (`video_ready = TRUE`) + Column H (`video_date = DD/MM/YY`) in Google Sheets via `action: "update_launch"`. Once added, the ID card turns **Violet** in Tab 3 (and removing it reverts the Bingo card to **Green**).
 
 ---
 

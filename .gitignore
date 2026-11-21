@@ -40,4 +40,6 @@ frontend/.vite/
 logs/
 .temp/
 .cache/
+backend/data/launch_calendar.json
+
 

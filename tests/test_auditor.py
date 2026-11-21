@@ -815,7 +815,222 @@ class TestScriptDoctorAuditorIntegration(unittest.TestCase):
         self.assertTrue(result["word_count"] > 70)
 
 
+class TestLaunchCalendarAndVioletBingo(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        # pyrefly: ignore[missing-import]
+        from app.services.calendar_service import CalendarService
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.cal_path = Path(self._tmp.name) / "launch_calendar.json"
+        self.cal_svc = CalendarService(storage_path=self.cal_path)
+        self.client = TestClient(app)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_normalize_launch_date_formats(self):
+        # pyrefly: ignore[missing-import]
+        from app.services.calendar_service import normalize_launch_date
+
+        self.assertEqual(normalize_launch_date("2026-11-20"), ("2026-11-20", "20/11/26"))
+        self.assertEqual(normalize_launch_date("20/11/26"), ("2026-11-20", "20/11/26"))
+        self.assertEqual(normalize_launch_date("20/11/2026"), ("2026-11-20", "20/11/26"))
+        with self.assertRaises(ValueError):
+            normalize_launch_date("31/02/26")
+
+    def test_readiness_gate_and_auto_check_col_e(self):
+        # pyrefly: ignore[missing-import]
+        from app.models.schemas import ScriptRecord
+
+        missing_desc = ScriptRecord(
+            ID="EF01",
+            expression="Silent letters",
+            SCRIPT_CHANGED="Final script",
+            script_ready=True,
+            short_description="",
+            language="english",
+            video_type="fun_facts",
+        )
+        r1 = self.cal_svc.evaluate_readiness(missing_desc)
+        self.assertFalse(r1["readiness_ok"])
+        self.assertEqual(r1["recommended_action"], "description_creation")
+
+        only_col_e_unchecked = ScriptRecord(
+            ID="EF01",
+            expression="Silent letters",
+            SCRIPT_CHANGED="Final script",
+            script_ready=False,
+            short_description="SEO description #Shorts",
+            language="english",
+            video_type="fun_facts",
+        )
+        r2 = self.cal_svc.evaluate_readiness(only_col_e_unchecked)
+        self.assertFalse(r2["readiness_ok"])
+        self.assertTrue(r2["can_auto_check_col_e"])
+        self.assertEqual(r2["recommended_action"], "auto_check_col_e")
+
+    def test_per_language_daily_cadence_and_force_override(self):
+        # pyrefly: ignore[missing-import]
+        from app.models.schemas import ScriptRecord
+
+        def make_rec(cid: str, lang: str, vtype: str, ready: bool = True) -> ScriptRecord:
+            return ScriptRecord(
+                ID=cid,
+                expression=f"Expr {cid}",
+                SCRIPT_CHANGED=f"Script {cid}",
+                script_ready=ready,
+                short_description=f"Desc {cid} #Shorts",
+                language=lang,
+                video_type=vtype,
+            )
+
+        with patch("app.routers.calendar.calendar_service", self.cal_svc), \
+             patch("app.routers.calendar.sheet_service.fetch_script_by_id") as mock_fetch, \
+             patch("app.routers.calendar.sheet_service.update_launch_fields") as mock_upd:
+            mock_upd.return_value = {"status": "success", "updated_fields": ["video_ready", "video_date"]}
+
+            # 1. Fun Fact day in English (EF01) passes
+            mock_fetch.return_value = make_rec("EF01", "english", "fun_facts")
+            r1 = self.client.post("/api/calendar/schedule", json={"script_id": "EF01", "launch_date": "2026-11-20"})
+            self.assertEqual(r1.status_code, 200)
+            self.assertTrue(r1.json()["success"])
+            self.assertTrue(r1.json()["data"]["sheet_synced"])
+
+            # 2. Scheduling an English Expression (EE01) on same Fun Fact day triggers soft warning
+            mock_fetch.return_value = make_rec("EE01", "english", "expression")
+            r2 = self.client.post("/api/calendar/schedule", json={"script_id": "EE01", "launch_date": "2026-11-20"})
+            self.assertEqual(r2.status_code, 200)
+            self.assertFalse(r2.json()["success"])
+            self.assertTrue(r2.json()["data"]["requires_override"])
+
+            # 3. Independent Spanish day on same date (SF01) passes without conflict
+            mock_fetch.return_value = make_rec("SF01", "spanish", "fun_facts", ready=False)
+            r3 = self.client.post(
+                "/api/calendar/schedule",
+                json={"script_id": "SF01", "launch_date": "2026-11-20", "auto_check_script_ready": True},
+            )
+            self.assertEqual(r3.status_code, 200)
+            self.assertTrue(r3.json()["success"])
+
+            # 4. Triad Day in English on 2026-11-21: 1 E + 1 G + 1 R allowed; 2nd E triggers warning unless force_override=True
+            for cid, vt in [("EE02", "expression"), ("EG02", "game"), ("ER02", "roleplay")]:
+                mock_fetch.return_value = make_rec(cid, "english", vt)
+                res = self.client.post("/api/calendar/schedule", json={"script_id": cid, "launch_date": "2026-11-21"})
+                self.assertTrue(res.json()["success"], f"Failed triad item {cid}: {res.json()}")
+
+            mock_fetch.return_value = make_rec("EE03", "english", "expression")
+            res_dup = self.client.post("/api/calendar/schedule", json={"script_id": "EE03", "launch_date": "2026-11-21"})
+            self.assertFalse(res_dup.json()["success"])
+            self.assertTrue(res_dup.json()["data"]["requires_override"])
+
+            res_forced = self.client.post(
+                "/api/calendar/schedule",
+                json={"script_id": "EE03", "launch_date": "2026-11-21", "force_override": True},
+            )
+            self.assertTrue(res_forced.json()["success"])
+
+    def test_matrix_violet_status_and_unschedule_reverts_to_green(self):
+        self.cal_svc.schedule_entry(
+            script_id="EE01",
+            iso_date="2026-11-20",
+            sheet_date="20/11/26",
+            language="english",
+            video_type="expression",
+            expression="Break a leg",
+        )
+        svc = SheetService()
+        mock_rows = {
+            "status": "success",
+            "count": 2,
+            "data": [
+                {
+                    "ID": "EE01",
+                    "expression": "Break a leg",
+                    "SCRIPT_CHANGED": "Script 1",
+                    "short_description": "Desc 1 #Shorts",
+                    "script_ready": True,
+                },
+                {
+                    "ID": "EE02",
+                    "expression": "Bite the bullet",
+                    "SCRIPT_CHANGED": "Script 2",
+                    "short_description": "Desc 2 #Shorts",
+                    "script_ready": True,
+                },
+            ],
+        }
+
+        with patch("app.services.sheet_service.calendar_service", self.cal_svc), \
+             patch("app.routers.calendar.calendar_service", self.cal_svc), \
+             patch.object(SheetService, "_http_get", return_value=mock_rows), \
+             patch("app.routers.calendar.sheet_service.update_launch_fields", return_value={"status": "success"}):
+            res1 = svc.fetch_matrix_category("english", "expression")
+            self.assertEqual(res1["items"][0]["status"], "violet")
+            self.assertEqual(res1["items"][0]["launch_date"], "20/11/26")
+            self.assertEqual(res1["items"][1]["status"], "green")
+
+            # Removing EE01 from calendar reverts its Bingo status back to green
+            del_resp = self.client.delete("/api/calendar/entries/EE01")
+            self.assertEqual(del_resp.status_code, 200)
+            self.assertTrue(del_resp.json()["success"])
+
+            res2 = svc.fetch_matrix_category("english", "expression")
+            self.assertEqual(res2["items"][0]["status"], "green")
+            self.assertEqual(res2["items"][0]["launch_date"], "")
+
+            # Explicitly unscheduled ID should not be re-imported by sheet reconciliation
+            reconciled = self.cal_svc.reconcile_from_sheet_records(
+                "english",
+                "expression",
+                [
+                    {
+                        "ID": "EE01",
+                        "video_ready": True,
+                        "video_date": "20/11/26",
+                        "SCRIPT_CHANGED": "Script 1",
+                        "short_description": "Desc 1",
+                    },
+                    {
+                        "ID": "EE04",
+                        "video_ready": True,
+                        "video_date": "19/11/26",
+                        "SCRIPT_CHANGED": "Script 4",
+                        "short_description": "Desc 4",
+                    },
+                ],
+            )
+            self.assertEqual(reconciled, 1)
+            self.assertIsNone(self.cal_svc.get_entry("EE01"))
+            ee04 = self.cal_svc.get_entry("EE04")
+            self.assertIsNotNone(ee04)
+            self.assertEqual(ee04["launch_date"], "2026-11-19")
+
+            # Preflight check endpoint returns readiness & cadence breakdown
+            # pyrefly: ignore[missing-import]
+            from app.models.schemas import ScriptRecord
+            with patch(
+                "app.routers.calendar.sheet_service.fetch_script_by_id",
+                return_value=ScriptRecord(
+                    ID="EE05",
+                    expression="Once in a blue moon",
+                    SCRIPT_CHANGED="Script 5",
+                    script_ready=True,
+                    short_description="Desc 5 #Shorts",
+                    language="english",
+                    video_type="expression",
+                ),
+            ):
+                chk_resp = self.client.post("/api/calendar/check", json={"script_id": "EE05", "launch_date": "20/11/26"})
+                self.assertEqual(chk_resp.status_code, 200)
+                chk_data = chk_resp.json()["data"]
+                self.assertTrue(chk_data["readiness"]["readiness_ok"])
+                self.assertTrue(chk_data["cadence"]["cadence_ok"])
+                self.assertEqual(chk_data["sheet_date"], "20/11/26")
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 

@@ -13,6 +13,7 @@ import requests
 from ..core.config import settings, ENDPOINT_REGISTRY, extract_spreadsheet_id, extract_gid
 from ..core.routing import parse_and_route_id, ParsedId, IdRoutingError
 from ..models.schemas import ScriptRecord
+from .calendar_service import calendar_service
 
 logger = logging.getLogger(__name__)
 
@@ -161,9 +162,47 @@ class SheetService:
 
         return res
 
+    def update_launch_fields(
+        self,
+        script_id: str,
+        video_ready: bool,
+        video_date: str,
+        script_ready: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """
+        Updates Column G (`video_ready`), Column H (`video_date`), and optionally Column E (`script_ready`)
+        in place on Google Sheets for YouTube Launch Calendar synchronization.
+        """
+        parsed: ParsedId = parse_and_route_id(script_id)
+
+        payload: Dict[str, Any] = {
+            "action": "update_launch",
+            "spreadsheet_id": parsed.spreadsheet_id,
+            "gid": parsed.gid,
+            "script_id": parsed.canonical_id,
+            "video_ready": bool(video_ready),
+            "video_date": str(video_date or "").strip(),
+        }
+        if script_ready is not None:
+            payload["script_ready"] = bool(script_ready)
+
+        logger.info(f"Updating launch fields for {parsed.canonical_id} in {parsed.spreadsheet_id} (gid={parsed.gid})")
+        res = self._http_post(self.master_url, payload)
+
+        if res.get("status") == "error":
+            raise SheetServiceError(f"Google Sheet error: {res.get('message', 'Unknown error')}")
+
+        if res.get("message") == "Data processed successfully" and res.get("count") == 0:
+            raise SheetServiceError(
+                "Google Sheet returned 'count: 0'. Please deploy the updated Code.gs in Google Sheets."
+            )
+
+        return res
+
     def fetch_matrix_category(self, language: str, video_type: str) -> Dict[str, Any]:
         """
-        Fetches all records for a given language and video type, returning a lightweight list of matrix items.
+        Fetches all records for a given language and video type, returning a lightweight 4-state list
+        of matrix items (`violet` | `green` | `yellow` | `grey`).
         """
         lang_clean = language.strip().lower()
         vtype_clean = video_type.strip().lower()
@@ -186,6 +225,9 @@ class SheetService:
         if not isinstance(records, list):
             raise SheetServiceError(f"Unexpected data format returned from Google Sheet: {data}")
 
+        # Sync any previously launched sheet rows (Col G video_ready + Col H video_date) into calendar state
+        calendar_service.reconcile_from_sheet_records(lang_clean, vtype_clean, records)
+
         items = []
         for r in records:
             raw_id = str(r.get("ID") or r.get("id") or "").strip().upper()
@@ -196,12 +238,18 @@ class SheetService:
 
             has_script_changed = bool(script_changed)
             has_short_description = bool(short_desc)
+            cal_entry = calendar_service.get_entry(raw_id)
+            launch_date = cal_entry.get("sheet_date", "") if cal_entry else ""
+            launch_date_iso = cal_entry.get("launch_date", "") if cal_entry else ""
 
-            # Three-state logic:
-            # - Grey: Column D (SCRIPT_CHANGED) is empty
-            # - Yellow: Column D is filled, but Column I (short_description) is empty
-            # - Green: Column D is filled AND Column I is filled
-            if has_script_changed and has_short_description:
+            # Four-state logic:
+            # - Violet: On Launch Calendar AND Col D + Col I filled
+            # - Green: Col D filled AND Col I filled (ready to schedule on Launch Calendar)
+            # - Yellow: Col D filled, but Col I empty
+            # - Grey: Col D empty
+            if cal_entry and has_script_changed and has_short_description:
+                status = "violet"
+            elif has_script_changed and has_short_description:
                 status = "green"
             elif has_script_changed:
                 status = "yellow"
@@ -211,9 +259,15 @@ class SheetService:
             items.append({
                 "id": raw_id,
                 "script_ready": bool(r.get("script_ready") is True or r.get("script_ready") == "true"),
-                "video_ready": bool(r.get("video_ready") is True or r.get("video_ready") == "true"),
+                "video_ready": bool(
+                    cal_entry
+                    or r.get("video_ready") is True
+                    or r.get("video_ready") == "true"
+                ),
                 "expression": str(r.get("expression") or r.get("topic") or r.get("subject") or "").strip(),
                 "script_date": str(r.get("script_date") or "").strip(),
+                "launch_date": launch_date,
+                "launch_date_iso": launch_date_iso,
                 "has_script_changed": has_script_changed,
                 "has_short_description": has_short_description,
                 "status": status

@@ -5,12 +5,15 @@ import { NotificationToast } from './components/NotificationToast';
 import { ScriptAuditorView } from './views/ScriptAuditorView';
 import { DescriptionCreationView } from './views/DescriptionCreationView';
 import { IdChecklistView } from './views/IdChecklistView';
+import { LaunchCalendarView } from './views/LaunchCalendarView';
 import { ActiveTab, ScriptRecord } from './types';
 import { fetchScriptById } from './services/api';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('script_auditor');
   const [currentScript, setCurrentScript] = useState<ScriptRecord | null>(null);
+  const [calendarTargetId, setCalendarTargetId] = useState<string | null>(null);
+  const [calendarVersion, setCalendarVersion] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -42,6 +45,17 @@ export const App: React.FC = () => {
     await handleSearch(id);
   };
 
+  const handleScheduleInCalendar = (id: string) => {
+    setCalendarTargetId(id.trim().toUpperCase());
+    setNotification(null);
+    setActiveTab('launch_calendar');
+  };
+
+  const handleOpenIdFromCalendar = async (id: string, targetTab: ActiveTab) => {
+    setActiveTab(targetTab);
+    await handleSearch(id);
+  };
+
   const handleScriptUpdated = (updated: ScriptRecord) => {
     setCurrentScript(updated);
   };
@@ -69,7 +83,7 @@ export const App: React.FC = () => {
       {/* Main Content Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
         {/* Universal ID Search Bar: shown on Script Auditor & Description Creator tabs */}
-        {activeTab !== 'id_checklist' && (
+        {activeTab !== 'id_checklist' && activeTab !== 'launch_calendar' && (
           <IdSearchBar
             onSearch={handleSearch}
             isLoading={isLoading}
@@ -108,6 +122,19 @@ export const App: React.FC = () => {
         {activeTab === 'id_checklist' && (
           <IdChecklistView
             onSelectId={handleSelectIdFromMatrix}
+            onScheduleInCalendar={handleScheduleInCalendar}
+            calendarVersion={calendarVersion}
+            onError={handleError}
+            onSuccess={handleSuccess}
+          />
+        )}
+
+        {activeTab === 'launch_calendar' && (
+          <LaunchCalendarView
+            initialScriptId={calendarTargetId}
+            onConsumeInitialId={() => setCalendarTargetId(null)}
+            onOpenIdInTab={handleOpenIdFromCalendar}
+            onCalendarChanged={() => setCalendarVersion((v) => v + 1)}
             onError={handleError}
             onSuccess={handleSuccess}
           />

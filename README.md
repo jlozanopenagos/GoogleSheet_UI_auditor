@@ -47,6 +47,20 @@ A standalone, high-performance web application designed for rapid auditing, edit
      - **Dynamic Variation**: High-temperature sampling (0.75) and varied opening/middle/closing angles ensure repeated runs for the same script produce fresh, non-repetitive descriptions.
      - **Prerequisite Gate**: Requires Column D (`SCRIPT_CHANGED`) to be non-empty before calling Gemini.
 
+4. **Tab 3: ID Checklist (4-State Bingo Matrix)**:
+   - Displays all canonical IDs per `(language, video_type)` color-coded across 4 lifecycle states:
+     - **Violet**: Already scheduled / launched on the YouTube Launch Calendar (`video_ready` + `video_date`, with Col D + Col I complete).
+     - **Green**: Ready to launch (Column D script revision + Column I SEO description both filled).
+     - **Yellow**: Script revision ready (Column D filled), needs SEO description (Column I empty).
+     - **Grey**: Script revision (Column D) empty.
+   - Clicking a Green card exposes a 1-click **"Schedule in Calendar"** button; clicking a Violet card shows its launch date and **"View / Move in Calendar"**.
+
+5. **Tab 4: Launch Calendar (Dynamic YouTube Release Tracker)**:
+   - Interactive Month/Week calendar tracking YouTube Shorts per language (`All`, `English`, `French`, `Spanish`, `Italian`).
+   - **Readiness Gate**: Verifies Column D (`SCRIPT_CHANGED`), Column E (`script_ready = TRUE`), and Column I (`short_description`) before scheduling, with jump links to Tab 1 / Tab 2 or a 1-click **"Check Column E & Add to Calendar"** shortcut when D + I are ready.
+   - **Per-Language Daily Cadence Rules (Soft Warning + Override)**: Supports **Fun Fact Day** (`1 Fun Fact`) or **Triad Day** (up to `3` shorts: `1 Expression + 1 Game + 1 Roleplay`) per language per day with an optional `"Force schedule anyway"` override.
+   - Syncs launch status to Column G (`video_ready`) and Column H (`video_date` in `DD/MM/YY`) in Google Sheets alongside `backend/data/launch_calendar.json`, turning scheduled IDs **Violet** inside the Bingo matrix (or reverting them to **Green** when unscheduled).
+
 ---
 
 ## Quick Start (Any Windows 11 PC or Tablet)
@@ -87,24 +101,24 @@ GoogleSheet_UI_auditor/
 ├── backend/
 │   ├── app/
 │   │   ├── core/               # Configuration (.env), canonical ID routing & sheet resolution
-│   │   ├── models/             # Typed Pydantic schemas (ScriptRecord, API envelopes)
-│   │   ├── routers/            # /api/sheets (script ops), /api/gemini (SEO generation)
-│   │   └── services/           # SheetService (HTTP client & retries), GeminiService, PromptService
+│   │   ├── models/             # Typed Pydantic schemas (ScriptRecord, MatrixItem, Calendar schemas)
+│   │   ├── routers/            # /api/sheets, /api/gemini, /api/calendar (Launch Calendar API)
+│   │   └── services/           # SheetService, CalendarService, GeminiService, PromptService
 │   ├── main.py                 # FastAPI application factory & static SPA host
 │   └── requirements.txt        # Production Python dependencies
 ├── frontend/                   # React 19 + TypeScript + Vite + Tailwind CSS
 │   ├── src/
-│   │   ├── components/         # IdSearchBar (DRY), Header, NotificationToast
-│   │   ├── views/              # ScriptAuditorView (Tab 1), DescriptionCreationView (Tab 2)
+│   │   ├── components/         # Header, NavigationTabs (4 tabs), IdSearchBar, NotificationToast
+│   │   ├── views/              # ScriptAuditorView, DescriptionCreationView, IdChecklistView, LaunchCalendarView
 │   │   ├── services/           # Typed API fetch client
 │   │   └── types/              # TypeScript interfaces
 │   ├── dist/                   # Pre-compiled static assets served directly by FastAPI
 │   ├── package.json
 │   └── vite.config.ts
 ├── apps_script/                # Enhanced Code.gs for Google Sheets Web App deployment
-│   ├── Code.gs                 # Full Apps Script code (reading A-I, updating D, E, F, I in place)
+│   ├── Code.gs                 # Full Apps Script code (reading A-I, updating D, E, F, G, H, I in place)
 │   └── README.md               # 2-minute deployment guide
-├── tests/                      # Automated test suite (routing, prompts, sheet mapping)
+├── tests/                      # Automated test suite (routing, prompts, sheets, calendar & Bingo)
 │   └── test_auditor.py
 ├── .env.example                # Environment variable configuration template
 ├── AGENTS.md                   # System guidelines, prompt rules & developer directives
@@ -116,7 +130,7 @@ GoogleSheet_UI_auditor/
 
 ## Google Apps Script Deployment
 
-To ensure Google Sheets reads Column I (`short_description`), formats dates as `DD/MM/YY`, and performs in-place cell updates for Columns D, E, F, and I:
+To ensure Google Sheets reads Column I (`short_description`), formats dates as `DD/MM/YY`, and performs in-place cell updates for Columns D, E, F, G (`video_ready`), H (`video_date`), and I:
 
 1. Open your Google Sheet(s).
 2. Go to **Extensions > Apps Script**.

@@ -8,6 +8,10 @@ import {
   DoctorScriptResult,
   MatrixCategoryData,
   BatchUpdateReadyPayload,
+  CalendarEntriesData,
+  CalendarPreflightResult,
+  CalendarSchedulePayload,
+  CalendarScheduleResult,
   ApiResponse,
 } from '../types';
 
@@ -106,6 +110,76 @@ export async function batchUpdateReady(payload: BatchUpdateReadyPayload): Promis
   const json: ApiResponse = await resp.json();
   if (!resp.ok || !json.success) {
     throw new Error(json.message || json.error || 'Failed to update ready state in Google Sheet.');
+  }
+
+  return json.data;
+}
+
+export async function fetchCalendarEntries(
+  month?: string,
+  language?: string
+): Promise<CalendarEntriesData> {
+  const params = new URLSearchParams();
+  if (month) params.set('month', month);
+  if (language && language !== 'all') params.set('language', language);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+  const resp = await fetch(`${API_BASE}/calendar/entries${qs}`);
+  const json: ApiResponse<CalendarEntriesData> = await resp.json();
+
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.message || json.error || 'Failed to fetch launch calendar.');
+  }
+
+  return json.data;
+}
+
+export async function checkCalendarId(
+  scriptId: string,
+  launchDate: string
+): Promise<CalendarPreflightResult> {
+  const resp = await fetch(`${API_BASE}/calendar/check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ script_id: scriptId.trim().toUpperCase(), launch_date: launchDate }),
+  });
+
+  const json: ApiResponse<CalendarPreflightResult> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || `Failed to check ID '${scriptId}'.`);
+  }
+
+  return json.data;
+}
+
+export async function scheduleCalendarId(
+  payload: CalendarSchedulePayload
+): Promise<ApiResponse<CalendarScheduleResult>> {
+  const resp = await fetch(`${API_BASE}/calendar/schedule`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...payload,
+      script_id: payload.script_id.trim().toUpperCase(),
+    }),
+  });
+
+  const json: ApiResponse<CalendarScheduleResult> & { detail?: string } = await resp.json();
+  if (!resp.ok) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to schedule script on Launch Calendar.');
+  }
+
+  return json;
+}
+
+export async function unscheduleCalendarId(scriptId: string): Promise<any> {
+  const cleanId = scriptId.trim().toUpperCase();
+  const resp = await fetch(`${API_BASE}/calendar/entries/${encodeURIComponent(cleanId)}`, {
+    method: 'DELETE',
+  });
+
+  const json: ApiResponse & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success) {
+    throw new Error(json.detail || json.message || json.error || `Failed to remove '${cleanId}' from calendar.`);
   }
 
   return json.data;

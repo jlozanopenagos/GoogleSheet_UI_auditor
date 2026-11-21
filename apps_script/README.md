@@ -12,8 +12,9 @@ This directory contains the enhanced `Code.gs` script for Google Apps Script Web
 2. **In-Place Targeted Row Updates**:
    - `action: "update_script"`: Locates the exact row matching the script `ID` (e.g. `EE01`) and updates Column D (`SCRIPT_CHANGED`), Column E (`script_ready`), and Column F (`script_date`) in place.
    - `action: "update_description"`: Locates the exact row matching the script `ID` and updates Column I (`short_description`) in place.
+   - `action: "update_launch"`: Locates the exact row matching the script `ID` and updates Column G (`video_ready`), Column H (`video_date`), and optionally Column E (`script_ready`) for YouTube launch calendar tracking.
 3. **Strict Date Formatting**:
-   - Cell dates in Column F are normalized to `DD/MM/YY` (e.g. `31/01/26`).
+   - Cell dates in Columns F and H are normalized to `DD/MM/YY` (e.g. `31/01/26`).
 
 ---
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileEdit, Sparkles, LayoutGrid } from 'lucide-react';
+import { FileEdit, Sparkles, LayoutGrid, Calendar } from 'lucide-react';
 import { ActiveTab } from '../types';
 
 export interface NavTabItem {
@@ -23,6 +23,11 @@ const TABS: NavTabItem[] = [
     id: 'id_checklist',
     label: 'ID checklist',
     icon: LayoutGrid,
+  },
+  {
+    id: 'launch_calendar',
+    label: 'Launch calendar',
+    icon: Calendar,
   },
 ];
 

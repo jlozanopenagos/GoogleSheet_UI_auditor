@@ -14,6 +14,8 @@
  *    - action: "update_script": Updates Column D (SCRIPT_CHANGED), Column E (script_ready),
  *      and Column F (script_date) for the matching ID in place.
  *    - action: "update_description": Updates Column I (short_description) in place.
+ *    - action: "update_launch": Updates Column G (video_ready), Column H (video_date),
+ *      and optionally Column E (script_ready) for YouTube launch calendar tracking.
  *    - Automatically resolves tabs by gid or tab name.
  * 
  * ==============================================================================
@@ -139,6 +141,8 @@ function doPost(e) {
       actionResult = handleUpdateScript(sheet, payload);
     } else if (action === "update_description") {
       actionResult = handleUpdateDescription(sheet, payload);
+    } else if (action === "update_launch") {
+      actionResult = handleUpdateLaunch(sheet, payload);
     } else {
       actionResult = handleBatchUpdate(sheet, payload);
     }
@@ -247,6 +251,22 @@ function handleUpdateScript(sheet, payload) {
     updatedFields.push("script_date");
   }
 
+  // 4. Optional Column G & H launch sync if included
+  if (payload.video_ready !== undefined) {
+    var vReady = Boolean(
+      payload.video_ready === true ||
+      payload.video_ready === "true" ||
+      payload.video_ready === 1 ||
+      payload.video_ready === "1"
+    );
+    sheet.getRange(rowIndex, colMap.video_ready + 1).setValue(vReady);
+    updatedFields.push("video_ready");
+  }
+  if (payload.video_date !== undefined) {
+    sheet.getRange(rowIndex, colMap.video_date + 1).setValue(String(payload.video_date || "").trim());
+    updatedFields.push("video_date");
+  }
+
   return {
     status: "success",
     message: "Row " + rowIndex + " updated successfully for ID " + targetId,
@@ -307,6 +327,83 @@ function handleUpdateDescription(sheet, payload) {
 }
 
 /**
+ * Updates Column G (video_ready), Column H (video_date), and optionally Column E/F
+ * for Launch Calendar synchronization.
+ */
+function handleUpdateLaunch(sheet, payload) {
+  var targetId = String(payload.script_id || payload.ID || payload.id || "").trim();
+  if (!targetId) {
+    return { status: "error", message: "Missing target ID in request payload" };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) {
+    return { status: "error", message: "Sheet contains no data rows" };
+  }
+
+  var headers = data[0].map(function(h) { return String(h || "").trim(); });
+  var colMap = resolveColumnIndexes(headers);
+
+  var targetIdUpper = targetId.toUpperCase();
+  var rowIndex = -1;
+
+  for (var r = 1; r < data.length; r++) {
+    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
+    if (cellId === targetIdUpper) {
+      rowIndex = r + 1;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
+  }
+
+  var updatedFields = [];
+
+  if (payload.script_ready !== undefined) {
+    var sReady = Boolean(
+      payload.script_ready === true ||
+      payload.script_ready === "true" ||
+      payload.script_ready === 1 ||
+      payload.script_ready === "1"
+    );
+    sheet.getRange(rowIndex, colMap.script_ready + 1).setValue(sReady);
+    updatedFields.push("script_ready");
+  }
+
+  if (payload.script_date !== undefined) {
+    sheet.getRange(rowIndex, colMap.script_date + 1).setValue(String(payload.script_date || "").trim());
+    updatedFields.push("script_date");
+  }
+
+  if (payload.video_ready !== undefined) {
+    var vReady = Boolean(
+      payload.video_ready === true ||
+      payload.video_ready === "true" ||
+      payload.video_ready === 1 ||
+      payload.video_ready === "1"
+    );
+    sheet.getRange(rowIndex, colMap.video_ready + 1).setValue(vReady);
+    updatedFields.push("video_ready");
+  }
+
+  if (payload.video_date !== undefined) {
+    sheet.getRange(rowIndex, colMap.video_date + 1).setValue(String(payload.video_date || "").trim());
+    updatedFields.push("video_date");
+  }
+
+  return {
+    status: "success",
+    message: "Launch fields updated successfully for ID " + targetId,
+    id: targetId,
+    sheet_name: sheet.getName(),
+    row_number: rowIndex,
+    updated_fields: updatedFields
+  };
+}
+
+/**
  * Bulk row update handler for backward compatibility.
  */
 function handleBatchUpdate(sheet, payload) {
@@ -335,6 +432,8 @@ function handleBatchUpdate(sheet, payload) {
     if (item.SCRIPT_CHANGED !== undefined) sheet.getRange(targetRow, colMap.script_changed + 1).setValue(item.SCRIPT_CHANGED);
     if (item.script_ready !== undefined) sheet.getRange(targetRow, colMap.script_ready + 1).setValue(Boolean(item.script_ready));
     if (item.script_date !== undefined) sheet.getRange(targetRow, colMap.script_date + 1).setValue(String(item.script_date));
+    if (item.video_ready !== undefined) sheet.getRange(targetRow, colMap.video_ready + 1).setValue(Boolean(item.video_ready));
+    if (item.video_date !== undefined) sheet.getRange(targetRow, colMap.video_date + 1).setValue(String(item.video_date));
     if (item.short_description !== undefined) sheet.getRange(targetRow, colMap.short_description + 1).setValue(String(item.short_description));
     updatedCount++;
   }

@@ -10,7 +10,8 @@ import {
   Sparkles,
   FileEdit,
   AlertCircle,
-  HelpCircle,
+  Calendar,
+  Rocket,
 } from 'lucide-react';
 import { MatrixItem, MatrixCategoryData, ActiveTab } from '../types';
 import { fetchMatrixCategory } from '../services/api';
@@ -31,12 +32,16 @@ const VIDEO_TYPES = [
 
 interface IdChecklistViewProps {
   onSelectId: (id: string, targetTab?: ActiveTab) => void;
+  onScheduleInCalendar?: (id: string) => void;
+  calendarVersion?: number;
   onError: (message: string) => void;
   onSuccess: (message: string) => void;
 }
 
 export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
   onSelectId,
+  onScheduleInCalendar,
+  calendarVersion = 0,
   onError,
 }) => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('english');
@@ -53,7 +58,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'green' | 'yellow' | 'grey'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'violet' | 'green' | 'yellow' | 'grey'>('all');
 
   // Fetch or load from cache
   const loadCategory = async (lang: string, vtype: string, forceRefresh = false) => {
@@ -83,10 +88,19 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
     loadCategory(selectedLanguage, selectedType);
   }, [selectedLanguage, selectedType]);
 
+  // Invalidate cache and refresh active category whenever Launch Calendar changes
+  useEffect(() => {
+    if (calendarVersion > 0) {
+      setCache({});
+      loadCategory(selectedLanguage, selectedType, true);
+    }
+  }, [calendarVersion]);
+
   // Filtered items
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       // Status filter
+      if (filterStatus === 'violet' && item.status !== 'violet') return false;
       if (filterStatus === 'green' && item.status !== 'green') return false;
       if (filterStatus === 'yellow' && item.status !== 'yellow') return false;
       if (filterStatus === 'grey' && item.status !== 'grey') return false;
@@ -106,15 +120,27 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
   // Summary statistics
   const stats = useMemo(() => {
     const total = items.length;
+    const violetCount = items.filter((i) => i.status === 'violet').length;
     const greenCount = items.filter((i) => i.status === 'green').length;
     const yellowCount = items.filter((i) => i.status === 'yellow').length;
     const greyCount = items.filter((i) => i.status === 'grey').length;
 
+    const violetPct = total > 0 ? Math.round((violetCount / total) * 1000) / 10 : 0;
     const greenPct = total > 0 ? Math.round((greenCount / total) * 1000) / 10 : 0;
     const yellowPct = total > 0 ? Math.round((yellowCount / total) * 1000) / 10 : 0;
     const greyPct = total > 0 ? Math.round((greyCount / total) * 1000) / 10 : 0;
 
-    return { total, greenCount, yellowCount, greyCount, greenPct, yellowPct, greyPct };
+    return {
+      total,
+      violetCount,
+      greenCount,
+      yellowCount,
+      greyCount,
+      violetPct,
+      greenPct,
+      yellowPct,
+      greyPct,
+    };
   }, [items]);
 
   // Click on tile: toggle selection / quick preview
@@ -218,7 +244,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
 
       {/* Progress & 3-State Metrics Dashboard */}
       <div className="bg-brand-surface/80 border border-brand-border rounded-2xl p-5 shadow-lg flex flex-col lg:flex-row items-center justify-between gap-6">
-        {/* Left: 3-State Metric Counters */}
+        {/* Left: 4-State Metric Counters */}
         <div className="flex flex-wrap items-center gap-5 sm:gap-6 w-full lg:w-auto">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-brand-ice/50 font-bold">Total IDs</div>
@@ -227,11 +253,26 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
 
           <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
 
+          {/* Violet Metric */}
+          <div className="flex flex-col">
+            <div className="text-[11px] uppercase tracking-wider text-violet-400 font-bold flex items-center gap-1">
+              <Rocket className="w-3.5 h-3.5" />
+              Violet (Launched)
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-extrabold text-violet-300 mono-font">{stats.violetCount}</span>
+              <span className="text-xs text-violet-400/70 font-semibold mono-font">({stats.violetPct}%)</span>
+            </div>
+            <span className="text-[10px] text-brand-ice/50">On Launch Calendar</span>
+          </div>
+
+          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
+
           {/* Green Metric */}
           <div className="flex flex-col">
             <div className="text-[11px] uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Green (Done)
+              Green (Ready)
             </div>
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-extrabold text-emerald-300 mono-font">{stats.greenCount}</span>
@@ -274,20 +315,27 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
         {/* Right: Multi-Segmented Progress Bar */}
         <div className="flex-1 max-w-lg w-full flex flex-col gap-2">
           <div className="flex items-center justify-between text-xs font-bold">
-            <span className="text-brand-ice/70">Production Readiness</span>
+            <span className="text-brand-ice/70">Production & Launch Readiness</span>
             <div className="flex items-center gap-3 text-[11px] mono-font">
-              <span className="text-emerald-400 font-bold">{stats.greenPct}% Complete</span>
+              <span className="text-violet-400 font-bold">{stats.violetPct}% Launched</span>
+              <span className="text-emerald-400 font-bold">{stats.greenPct}% Ready</span>
               <span className="text-amber-400 font-bold">{stats.yellowPct}% Scripted</span>
             </div>
           </div>
 
           {/* Multi-segmented Bar */}
           <div className="w-full h-3.5 bg-brand-dark rounded-full overflow-hidden border border-brand-border/80 flex">
+            {/* Violet Segment */}
+            <div
+              className="h-full bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 transition-all duration-300 shadow-sm"
+              style={{ width: `${stats.violetPct}%` }}
+              title={`Violet (Launched): ${stats.violetCount} (${stats.violetPct}%)`}
+            />
             {/* Green Segment */}
             <div
               className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300 shadow-sm"
               style={{ width: `${stats.greenPct}%` }}
-              title={`Green: ${stats.greenCount} (${stats.greenPct}%)`}
+              title={`Green (Ready): ${stats.greenCount} (${stats.greenPct}%)`}
             />
             {/* Yellow Segment */}
             <div
@@ -319,6 +367,18 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             }`}
           >
             All IDs ({stats.total})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('violet')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              filterStatus === 'violet'
+                ? 'bg-violet-600/35 text-violet-200 border border-violet-400/50 shadow-sm'
+                : 'text-slate-400 hover:text-violet-300'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-violet-400" />
+            <span>Violet ({stats.violetCount})</span>
           </button>
           <button
             type="button"
@@ -377,7 +437,9 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
           <div className="flex items-center gap-3">
             <div
               className={`w-11 h-11 rounded-xl flex items-center justify-center font-extrabold mono-font text-sm border ${
-                activeItem.status === 'green'
+                activeItem.status === 'violet'
+                  ? 'bg-violet-600/35 text-violet-200 border-violet-400/70'
+                  : activeItem.status === 'green'
                   ? 'bg-emerald-600/30 text-emerald-200 border-emerald-500/60'
                   : activeItem.status === 'yellow'
                   ? 'bg-amber-500/30 text-amber-200 border-amber-500/60'
@@ -388,32 +450,51 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-bold text-white">{activeItem.expression || 'No title'}</span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                    activeItem.status === 'green'
+                    activeItem.status === 'violet'
+                      ? 'bg-violet-500/25 text-violet-200 border border-violet-400/50'
+                      : activeItem.status === 'green'
                       ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                       : activeItem.status === 'yellow'
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                       : 'bg-slate-700/40 text-slate-400 border border-slate-600/40'
                   }`}
                 >
-                  {activeItem.status === 'green'
-                    ? 'Done (Script + Description)'
+                  {activeItem.status === 'violet'
+                    ? `Launched · ${activeItem.launch_date || 'On Calendar'}`
+                    : activeItem.status === 'green'
+                    ? 'Ready (Script + Description)'
                     : activeItem.status === 'yellow'
                     ? 'Script Ready · Needs Description'
                     : 'Needs Script'}
                 </span>
               </div>
-              <div className="text-xs text-brand-ice/60 mt-0.5 flex items-center gap-3">
+              <div className="text-xs text-brand-ice/60 mt-0.5 flex flex-wrap items-center gap-3">
                 <span>Col D (Script): {activeItem.has_script_changed ? '✓ Filled' : '✗ Empty'}</span>
+                <span>Col E (Checked): {activeItem.script_ready ? '✓ Ready' : '○ Pending'}</span>
                 <span>Col I (Description): {activeItem.has_short_description ? '✓ Filled' : '✗ Empty'}</span>
+                {activeItem.launch_date && (
+                  <span className="text-violet-300 font-semibold">Launch: {activeItem.launch_date}</span>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {onScheduleInCalendar && (activeItem.status === 'green' || activeItem.status === 'violet') && (
+              <button
+                type="button"
+                onClick={() => onScheduleInCalendar(activeItem.id)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-95 text-white rounded-xl text-xs font-bold shadow-md shadow-violet-600/25 transition-all cursor-pointer"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{activeItem.status === 'violet' ? 'View / Move in Calendar' : 'Schedule in Calendar'}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onSelectId(activeItem.id, 'script_auditor')}
@@ -445,7 +526,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
           <div className="flex flex-col items-center justify-center p-16 text-center">
             <RefreshCw className="w-8 h-8 text-brand-sky animate-spin mb-3" />
             <p className="text-sm font-semibold text-white">Loading IDs from Google Sheets...</p>
-            <p className="text-xs text-brand-ice/60 mt-1">Reading Column D (SCRIPT_CHANGED) and Column I (short_description)</p>
+            <p className="text-xs text-brand-ice/60 mt-1">Reading Column D, Column I, and YouTube Launch Calendar state</p>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center text-slate-400">
@@ -458,11 +539,15 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             {filteredItems.map((item) => {
               const isSelected = activeTileId === item.id;
 
-              // Color styles per state
+              // Color styles per 4-state lifecycle
               let tileClass = '';
               let badgeColor = '';
 
-              if (item.status === 'green') {
+              if (item.status === 'violet') {
+                // VIOLET: Scheduled / Launched on YouTube Calendar
+                tileClass = 'bg-violet-600/35 text-violet-200 border-violet-400/60 shadow-sm shadow-violet-500/20 hover:bg-violet-600/50 hover:border-violet-300 hover:scale-105';
+                badgeColor = 'bg-violet-400';
+              } else if (item.status === 'green') {
                 // GREEN: Col D filled AND Col I filled
                 tileClass = 'bg-emerald-600/30 text-emerald-200 border-emerald-500/50 shadow-sm shadow-emerald-500/15 hover:bg-emerald-600/45 hover:border-emerald-400 hover:scale-105';
                 badgeColor = 'bg-emerald-400';
@@ -480,8 +565,10 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
                 <div
                   key={item.id}
                   title={`${item.id}: ${item.expression || 'No title'}\nStatus: ${
-                    item.status === 'green'
-                      ? 'Green (Done: Script + Description)'
+                    item.status === 'violet'
+                      ? `Violet (Launched on ${item.launch_date || 'YouTube Calendar'})`
+                      : item.status === 'green'
+                      ? 'Green (Ready: Script + Description)'
                       : item.status === 'yellow'
                       ? 'Yellow (Script ready, Needs Description)'
                       : 'Grey (No Script Changed)'
@@ -510,8 +597,12 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
         <div className="mt-6 pt-4 border-t border-brand-border/40 flex flex-wrap items-center justify-between text-xs text-brand-ice/60 gap-3">
           <div className="flex flex-wrap items-center gap-4">
             <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-violet-500/40 border border-violet-400/70" />
+              <strong className="text-violet-300">Violet:</strong> Launched (On Calendar)
+            </span>
+            <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-emerald-500/30 border border-emerald-500/60" />
-              <strong className="text-emerald-300">Green:</strong> Done (Col D + Col I filled)
+              <strong className="text-emerald-300">Green:</strong> Ready (Col D + Col I filled)
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-amber-500/30 border border-amber-500/60" />
