@@ -4,6 +4,8 @@
 
 `GoogleSheet_UI_auditor` is an independent, high-performance web studio engineered to inspect, audit, modify, and enrich YouTube Shorts video scripts and metadata across 16 Google Sheets (4 languages × 4 video formats).
 
+This repository owns editorial review, descriptions, readiness, and release scheduling. Shorts Studio and ComfyUI run separately. Run `py tests/test_auditor.py` for local backend checks. Preserve mocked Sheets and Gemini boundaries in tests and keep the checked-in production frontend bundle in sync with frontend source changes.
+
 Instead of manually navigating multiple Google Sheets files in a browser, creators use this standalone tool to:
 1. Instantly navigate to any script by canonical ID (e.g., `EF01`, `SR04`).
 2. Compare original script narration (Column C) against edited revisions (Column D).

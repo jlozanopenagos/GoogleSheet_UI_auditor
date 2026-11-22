@@ -4,6 +4,8 @@ A standalone, high-performance web application designed for rapid auditing, edit
 
 ---
 
+The auditor handles script review, descriptions, and release planning. Shorts Studio in the separate `shorts_automation` repository handles voice, image, thumbnail, and video production. The two apps share Google Sheets through Apps Script.
+
 ## Key Features
 
 1. **Deterministic Single-ID Routing**:
@@ -145,5 +147,5 @@ To ensure Google Sheets reads Column I (`short_description`), formats dates as `
 ```powershell
 py tests/test_auditor.py
 ```
-Executes all unit tests covering ID routing, format-specific prompt synthesis, and API endpoints.
+Runs the local auditor suite for ID routing, editorial prompts, Sheets operations, calendar scheduling, and API endpoints. HTTP responses from Google Sheets and Gemini are mocked. The suite can run without live editorial writes.
 

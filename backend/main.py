@@ -4,7 +4,6 @@ main.py — FastAPI Server Entrypoint for GoogleSheet_UI_auditor
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 # pyrefly: ignore[missing-import]
 from fastapi import FastAPI
@@ -54,15 +53,15 @@ def health_check():
 
 
 # Static frontend hosting (serves pre-compiled React SPA from frontend/dist)
-static_dir = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+static_dir = (Path(__file__).resolve().parent.parent / "frontend" / "dist").resolve()
 if static_dir.exists():
     app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         # Serve static file if exists, else serve index.html for SPA client-side routing
-        file_path = static_dir / full_path
-        if file_path.exists() and file_path.is_file():
+        file_path = (static_dir / full_path).resolve()
+        if file_path.is_relative_to(static_dir) and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(static_dir / "index.html")
 

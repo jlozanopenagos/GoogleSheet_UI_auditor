@@ -18,6 +18,8 @@ This directory contains the enhanced `Code.gs` script for Google Apps Script Web
 
 ---
 
+The Apps Script endpoint serves the editorial auditor. Keep its deployment URL in the auditor's local configuration. Run the auditor's mocked tests before deploying any sheet schema changes.
+
 ## Deployment Steps (2 Minutes)
 
 1. Open your master Google Sheet (the one where your scripts live).
