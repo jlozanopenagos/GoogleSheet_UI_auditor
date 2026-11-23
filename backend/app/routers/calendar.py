@@ -188,11 +188,9 @@ def schedule_calendar_id(payload: CalendarScheduleRequest) -> ApiResponse:
             script_ready=True if auto_checked_col_e else None,
         )
         updated_fields = res.get("updated_fields")
-        # Legacy Code.gs fallback returns updated_count instead of updated_fields
-        if isinstance(updated_fields, list):
-            sheet_synced = "video_date" in updated_fields or "video_ready" in updated_fields
-        else:
-            sheet_synced = bool(res.get("status") == "success")
+        sheet_synced = isinstance(updated_fields, list) and (
+            "video_date" in updated_fields or "video_ready" in updated_fields
+        )
     except SheetServiceError as exc:
         sheet_sync_warning = str(exc)
         logger.warning(f"Launch Calendar Google Sheet sync warning for {record.ID}: {exc}")
@@ -229,6 +227,26 @@ def schedule_calendar_id(payload: CalendarScheduleRequest) -> ApiResponse:
             "readiness": readiness,
             "cadence": cadence,
             "record": record.model_dump(),
+        },
+    )
+
+
+@router.post("/sync", response_model=ApiResponse)
+def sync_calendar_from_sheets(
+    month: Optional[str] = Query(None, description="Optional YYYY-MM filter for returned entries"),
+    language: Optional[str] = Query(None, description="Optional language filter for returned entries"),
+) -> ApiResponse:
+    """Pulls scheduled video_ready + video_date rows across all Google Sheet tabs into the Launch Calendar."""
+    sync_stats = sheet_service.sync_calendar_from_all_sheets(clear_unscheduled=True)
+    entries = calendar_service.list_entries(month=month, language=language)
+    summary = calendar_service.summarize_entries(entries)
+    return ApiResponse(
+        success=True,
+        message=f"Synced from Google Sheets ({sync_stats['synced_added']} new entry(s) imported, {len(entries)} total).",
+        data={
+            **sync_stats,
+            "entries": entries,
+            "summary": summary,
         },
     )
 

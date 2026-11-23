@@ -5,7 +5,7 @@ routing.py — Canonical ID Parsing & Google Sheet Target Resolver (Single Respo
 from __future__ import annotations
 
 import re
-from typing import Dict, Tuple, Optional
+from typing import Dict, Optional
 # pyrefly: ignore[missing-import]
 from pydantic import BaseModel
 from .config import ENDPOINT_REGISTRY, extract_spreadsheet_id, extract_gid
@@ -45,7 +45,7 @@ class IdRoutingError(ValueError):
 def parse_and_route_id(raw_id: str) -> ParsedId:
     """
     Parses a canonical ID (e.g. 'EE01', 'FG04', 'SR10') and resolves its Google Sheet location.
-    
+
     Raises:
         IdRoutingError: If ID format is invalid or no spreadsheet is configured for that combination.
     """

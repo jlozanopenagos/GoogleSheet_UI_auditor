@@ -388,6 +388,14 @@ class CalendarService:
             self._save()
         return dict(entry)
 
+    def clear_unscheduled_ids(self) -> int:
+        with self._lock:
+            count = len(self._unscheduled_ids)
+            if count > 0:
+                self._unscheduled_ids.clear()
+                self._save()
+            return count
+
     def unschedule_entry(self, script_id: str) -> Optional[Dict[str, Any]]:
         cid = script_id.strip().upper()
         with self._lock:

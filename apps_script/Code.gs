@@ -244,10 +244,10 @@ function handleUpdateScript(sheet, payload) {
     updatedFields.push("script_ready");
   }
 
-  // 3. Update Column F: script_date
+  // 3. Update Column F: script_date (force plain text so DD/MM/YY is never flipped by sheet locale)
   if (payload.script_date !== undefined) {
     var scriptDate = String(payload.script_date || "").trim();
-    sheet.getRange(rowIndex, colMap.script_date + 1).setValue(scriptDate);
+    sheet.getRange(rowIndex, colMap.script_date + 1).setNumberFormat("@").setValue(scriptDate);
     updatedFields.push("script_date");
   }
 
@@ -373,7 +373,7 @@ function handleUpdateLaunch(sheet, payload) {
   }
 
   if (payload.script_date !== undefined) {
-    sheet.getRange(rowIndex, colMap.script_date + 1).setValue(String(payload.script_date || "").trim());
+    sheet.getRange(rowIndex, colMap.script_date + 1).setNumberFormat("@").setValue(String(payload.script_date || "").trim());
     updatedFields.push("script_date");
   }
 
@@ -389,7 +389,7 @@ function handleUpdateLaunch(sheet, payload) {
   }
 
   if (payload.video_date !== undefined) {
-    sheet.getRange(rowIndex, colMap.video_date + 1).setValue(String(payload.video_date || "").trim());
+    sheet.getRange(rowIndex, colMap.video_date + 1).setNumberFormat("@").setValue(String(payload.video_date || "").trim());
     updatedFields.push("video_date");
   }
 
@@ -431,9 +431,9 @@ function handleBatchUpdate(sheet, payload) {
     var targetRow = idToRowMap[rowId];
     if (item.SCRIPT_CHANGED !== undefined) sheet.getRange(targetRow, colMap.script_changed + 1).setValue(item.SCRIPT_CHANGED);
     if (item.script_ready !== undefined) sheet.getRange(targetRow, colMap.script_ready + 1).setValue(Boolean(item.script_ready));
-    if (item.script_date !== undefined) sheet.getRange(targetRow, colMap.script_date + 1).setValue(String(item.script_date));
+    if (item.script_date !== undefined) sheet.getRange(targetRow, colMap.script_date + 1).setNumberFormat("@").setValue(String(item.script_date));
     if (item.video_ready !== undefined) sheet.getRange(targetRow, colMap.video_ready + 1).setValue(Boolean(item.video_ready));
-    if (item.video_date !== undefined) sheet.getRange(targetRow, colMap.video_date + 1).setValue(String(item.video_date));
+    if (item.video_date !== undefined) sheet.getRange(targetRow, colMap.video_date + 1).setNumberFormat("@").setValue(String(item.video_date));
     if (item.short_description !== undefined) sheet.getRange(targetRow, colMap.short_description + 1).setValue(String(item.short_description));
     updatedCount++;
   }

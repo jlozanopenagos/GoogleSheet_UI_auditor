@@ -40,6 +40,11 @@ frontend/.vite/
 logs/
 .temp/
 .cache/
+.pytest_cache/
+.pytest_tmp/
+.ruff_cache/
+.coverage
+htmlcov/
 backend/data/launch_calendar.json
 
 

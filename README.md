@@ -61,7 +61,8 @@ The auditor handles script review, descriptions, and release planning. Shorts St
    - Interactive Month/Week calendar tracking YouTube Shorts per language (`All`, `English`, `French`, `Spanish`, `Italian`).
    - **Readiness Gate**: Verifies Column D (`SCRIPT_CHANGED`), Column E (`script_ready = TRUE`), and Column I (`short_description`) before scheduling, with jump links to Tab 1 / Tab 2 or a 1-click **"Check Column E & Add to Calendar"** shortcut when D + I are ready.
    - **Per-Language Daily Cadence Rules (Soft Warning + Override)**: Supports **Fun Fact Day** (`1 Fun Fact`) or **Triad Day** (up to `3` shorts: `1 Expression + 1 Game + 1 Roleplay`) per language per day with an optional `"Force schedule anyway"` override.
-   - Syncs launch status to Column G (`video_ready`) and Column H (`video_date` in `DD/MM/YY`) in Google Sheets alongside `backend/data/launch_calendar.json`, turning scheduled IDs **Violet** inside the Bingo matrix (or reverting them to **Green** when unscheduled).
+   - Syncs launch status to Column G (`video_ready`) and Column H (`video_date` plain-text `DD/MM/YY` via `.setNumberFormat("@")`) in Google Sheets alongside `backend/data/launch_calendar.json`, turning scheduled IDs **Violet** inside the Bingo matrix (or reverting them to **Green** when unscheduled).
+   - Includes a **"Sync from Sheets"** button (`POST /api/calendar/sync`) to pull scheduled IDs across all 16 Google Sheet tabs onto any PC.
 
 ---
 
@@ -108,22 +109,32 @@ GoogleSheet_UI_auditor/
 │   │   └── services/           # SheetService, CalendarService, GeminiService, PromptService
 │   ├── main.py                 # FastAPI application factory & static SPA host
 │   └── requirements.txt        # Production Python dependencies
-├── frontend/                   # React 19 + TypeScript + Vite + Tailwind CSS
+├── frontend/                   # React 19 + TypeScript + Vite + Tailwind CSS + Vitest
 │   ├── src/
 │   │   ├── components/         # Header, NavigationTabs (4 tabs), IdSearchBar, NotificationToast
 │   │   ├── views/              # ScriptAuditorView, DescriptionCreationView, IdChecklistView, LaunchCalendarView
 │   │   ├── services/           # Typed API fetch client
-│   │   └── types/              # TypeScript interfaces
+│   │   ├── types/              # TypeScript interfaces
+│   │   └── __tests__/          # Vitest + React Testing Library unit/component suites
 │   ├── dist/                   # Pre-compiled static assets served directly by FastAPI
 │   ├── package.json
-│   └── vite.config.ts
+│   ├── vite.config.ts
+│   └── vitest.config.ts
 ├── apps_script/                # Enhanced Code.gs for Google Sheets Web App deployment
 │   ├── Code.gs                 # Full Apps Script code (reading A-I, updating D, E, F, G, H, I in place)
 │   └── README.md               # 2-minute deployment guide
-├── tests/                      # Automated test suite (routing, prompts, sheets, calendar & Bingo)
-│   └── test_auditor.py
+├── tests/                      # Layered quality suite (isolated offline by conftest.py)
+│   ├── unit/                   # Routing, prompts, Gemini, Script Doctor, Calendar, SheetService
+│   ├── api/                    # FastAPI TestClient router contract tests
+│   ├── integration/            # End-to-end Calendar <-> Bingo 4-state workflows
+│   ├── contract/               # Structural verification against apps_script/Code.gs
+│   ├── conftest.py             # Temp CalendarService isolation & network guardrails
+│   ├── helpers.py              # Shared test data builders
+│   └── run_tests.py            # Unified runner (--layer, --check-static, --coverage, --live-smoke)
 ├── .env.example                # Environment variable configuration template
-├── AGENTS.md                   # System guidelines, prompt rules & developer directives
+├── AGENTS.md                   # System guidelines, architecture, & mandatory test-layer policy
+├── pyproject.toml              # Pytest markers, local basetemp & ruff configuration
+├── requirements-dev.txt        # Test & static-check dependencies (pytest, pytest-cov, ruff)
 ├── run.py                      # Root one-click launcher
 └── README.md                   # Operational manual (this document)
 ```
@@ -142,10 +153,28 @@ To ensure Google Sheets reads Column I (`short_description`), formats dates as `
 
 ---
 
-## Running Automated Tests
+## Running Automated Tests & Quality Gates
 
+The test layer is an **integral part of the project**, never an isolated afterthought. Whenever application code or `Code.gs` changes, always consider whether corresponding tests must be **created, updated, or deleted**, and run both backend and frontend gates:
+
+### Backend & Contract Suite
 ```powershell
-py tests/test_auditor.py
+# Install dev/test dependencies once
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+# Run ruff static checks + all layers (unit, api, integration, contract) + coverage
+.venv\Scripts\python.exe tests/run_tests.py --layer all --check-static --coverage
+
+# Optional: run a single layer or the opt-in live Apps Script health probe (ZZ999)
+.venv\Scripts\python.exe tests/run_tests.py --layer unit
+.venv\Scripts\python.exe tests/run_tests.py --live-smoke
 ```
-Runs the local auditor suite for ID routing, editorial prompts, Sheets operations, calendar scheduling, and API endpoints. HTTP responses from Google Sheets and Gemini are mocked. The suite can run without live editorial writes.
+All default layers run 100% offline with mocked HTTP and an isolated temporary `launch_calendar.json`.
+
+### Frontend Suite (`Vitest` + `TypeScript`)
+```powershell
+cd frontend
+npm.cmd run test
+npm.cmd run build
+```
 

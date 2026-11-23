@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import requests
 
 from ..core.config import settings, ENDPOINT_REGISTRY, extract_spreadsheet_id, extract_gid
@@ -39,7 +39,7 @@ class SheetService:
     def fetch_script_by_id(self, raw_id: str) -> ScriptRecord:
         """
         Parses ID, queries target Google Sheet, and returns the matching ScriptRecord.
-        
+
         Raises:
             IdRoutingError: If ID syntax is invalid or endpoint not found.
             ScriptNotFoundError: If ID does not exist in the spreadsheet.
@@ -192,12 +192,56 @@ class SheetService:
         if res.get("status") == "error":
             raise SheetServiceError(f"Google Sheet error: {res.get('message', 'Unknown error')}")
 
-        if res.get("message") == "Data processed successfully" and res.get("count") == 0:
+        if "updated_fields" not in res and (
+            res.get("count") == 0
+            or res.get("message") in ("Data processed successfully", "No rows provided")
+        ):
             raise SheetServiceError(
-                "Google Sheet returned 'count: 0'. Please deploy the updated Code.gs in Google Sheets."
+                "Google Sheet returned an empty batch response. Please deploy the updated Code.gs in Google Sheets."
             )
 
         return res
+
+    def sync_calendar_from_all_sheets(self, clear_unscheduled: bool = True) -> Dict[str, Any]:
+        """Pulls all 16 Google Sheet tabs in parallel and reconciles scheduled entries into CalendarService."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        if clear_unscheduled:
+            calendar_service.clear_unscheduled_ids()
+
+        def _fetch_tab(lang: str, vtype: str, endpoint_url: str) -> Tuple[str, str, int]:
+            spreadsheet_id = extract_spreadsheet_id(endpoint_url)
+            gid = extract_gid(endpoint_url)
+            query_url = f"{self.master_url}?id={spreadsheet_id}"
+            if gid:
+                query_url += f"&gid={gid}"
+            data = self._http_get(query_url)
+            records = data.get("data", [])
+            if not isinstance(records, list):
+                raise SheetServiceError(f"Unexpected data format for {lang}/{vtype}")
+            added = calendar_service.reconcile_from_sheet_records(lang, vtype, records)
+            return lang, vtype, added
+
+        total_added = 0
+        errors: List[str] = []
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {
+                pool.submit(_fetch_tab, lang, vtype, url): (lang, vtype)
+                for (lang, vtype), url in ENDPOINT_REGISTRY.items()
+            }
+            for fut in as_completed(futures):
+                lang, vtype = futures[fut]
+                try:
+                    _, _, added = fut.result()
+                    total_added += added
+                except Exception as exc:
+                    errors.append(f"{lang}/{vtype}: {exc}")
+
+        return {
+            "synced_added": total_added,
+            "tabs_checked": len(ENDPOINT_REGISTRY),
+            "errors": errors,
+        }
 
     def fetch_matrix_category(self, language: str, video_type: str) -> Dict[str, Any]:
         """

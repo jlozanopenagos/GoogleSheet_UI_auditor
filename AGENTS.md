@@ -4,7 +4,7 @@
 
 `GoogleSheet_UI_auditor` is an independent, high-performance web studio engineered to inspect, audit, modify, and enrich YouTube Shorts video scripts and metadata across 16 Google Sheets (4 languages × 4 video formats).
 
-This repository owns editorial review, descriptions, readiness, and release scheduling. Shorts Studio and ComfyUI run separately. Run `py tests/test_auditor.py` for local backend checks. Preserve mocked Sheets and Gemini boundaries in tests and keep the checked-in production frontend bundle in sync with frontend source changes.
+This repository owns editorial review, descriptions, readiness, and release scheduling. Shorts Studio and ComfyUI run separately. Always run the full quality gate — `.venv\Scripts\python.exe tests/run_tests.py --layer all --check-static` (backend static checks + `unit`, `api`, `integration`, and `contract` suites) and `cd frontend; npm.cmd run test` (Vitest UI/API suite) — before finishing changes. Preserve mocked Sheets and Gemini boundaries in offline tests and keep the checked-in production frontend bundle (`frontend/dist/`) in sync with frontend source changes.
 
 Instead of manually navigating multiple Google Sheets files in a browser, creators use this standalone tool to:
 1. Instantly navigate to any script by canonical ID (e.g., `EF01`, `SR04`).
@@ -125,7 +125,7 @@ When the user submits an ID into the search bar:
 - **Per-Language Daily Cadence Rules (Soft Warning + Override)**:
   - **Fun Fact Day**: `1 FUN_FACTS` short per day per language.
   - **Triad Day**: Up to `3` shorts per day per language (`1 EXPRESSION + 1 GAME + 1 ROLEPLAY`, flagging format duplicates or mixing Fun Facts unless overridden with `"Force schedule anyway"`).
-- **Persistence**: Saves launch records to `backend/data/launch_calendar.json` and syncs Column G (`video_ready = TRUE`) + Column H (`video_date = DD/MM/YY`) in Google Sheets via `action: "update_launch"`. Once added, the ID card turns **Violet** in Tab 3 (and removing it reverts the Bingo card to **Green**).
+- **Persistence & Multi-PC Sync**: Saves launch records to `backend/data/launch_calendar.json` and syncs Column G (`video_ready = TRUE`) + Column H (`video_date = DD/MM/YY`) in Google Sheets via `action: "update_launch"`. `apps_script/Code.gs` applies `.setNumberFormat("@")` on `script_date` / `video_date` writes so Google Sheets preserves `DD/MM/YY` literal text without locale day/month flipping. Once added, the ID card turns **Violet** in Tab 3 (removing it reverts the Bingo card to **Green**). Use the **"Sync from Sheets"** button (`POST /api/calendar/sync`) to pull scheduled rows across all 16 Google Sheet tabs onto any PC.
 
 ---
 
@@ -155,10 +155,36 @@ The Gemini system prompts are specialized per video format to follow 2026 YouTub
 
 ---
 
-## 7. Developer Guidelines
+## 7. Testing Architecture & Mandatory Test-Layer Policy
+
+### Multi-Layer Quality Architecture
+| Layer | Location | Purpose & Scope |
+| :--- | :--- | :--- |
+| **Static Analysis** | `pyproject.toml` (`ruff`) + `tsc` | Catches undefined names, unused imports, lint errors, and TypeScript regressions before runtime. |
+| **Backend Unit** | `tests/unit/` | Fast pure-logic & service tests (`routing`, `prompt_service`, `gemini_auditor`, `gemini_service`, `script_doctor_service`, `calendar_service`, `sheet_service`). |
+| **Backend API** | `tests/api/` | FastAPI `TestClient` router contracts (`sheets`, `gemini`, `calendar`), HTTP status codes (`400`/`404`/`502`), and validation rules. |
+| **Backend Integration** | `tests/integration/` | Cross-service lifecycles (`Schedule -> Violet Bingo -> Move -> Unschedule -> Green Bingo -> Sync from Sheets`). |
+| **Apps Script Contract** | `tests/contract/` | Verifies `apps_script/Code.gs` handles all backend `doPost` actions, returns `updated_fields`, and enforces `.setNumberFormat("@")` on date cells. |
+| **Frontend Tests** | `frontend/src/__tests__/` | `vitest` + `@testing-library/react` tests for `services/api.ts`, `LaunchCalendarView.tsx`, and `IdChecklistView.tsx`. |
+
+- **Global Isolation Guardrails (`tests/conftest.py`)**: An `autouse` fixture isolates `CalendarService` to a per-test temp JSON file (protecting live `backend/data/launch_calendar.json`) and blocks accidental real outbound HTTP requests via `requests.Session.request` unless explicitly running `--live-smoke`.
+- **Unified Runner (`tests/run_tests.py`)**: Run `--layer {unit,api,integration,contract,all}`, `--check-static`, `--coverage`, or opt-in `--live-smoke` (harmless `ZZ999` probe verifying live Apps Script deployment).
+
+### Mandatory Test-Layer Coupling Rule (Never Isolate Tests)
+> [!IMPORTANT]
+> **The test layer is an inseparable part of this application — never isolate tests from feature or maintenance work.**
+> Whenever you introduce a new feature, modify existing logic, refactor modules, or remove/deprecate functionality, you **MUST** evaluate the impact on every relevant test layer:
+> 1. **Create** unit, API, integration, contract, and/or frontend tests covering any new behavior, edge cases, or bug fixes.
+> 2. **Update** existing tests whenever schemas, API contracts, UI flows, or Apps Script handlers change.
+> 3. **Delete** obsolete tests when features or modules are intentionally removed so the suite never carries dead or misleading coverage.
+> 4. **Verify** the full static + test + build gate passes before concluding (`tests/run_tests.py --layer all --check-static --coverage`, `npm.cmd run test`, and `npm.cmd run build`).
+
+---
+
+## 8. Developer Guidelines
 
 - **Portability**: The web app runs on localhost via a single command: `py run.py`.
-- **Backend**: FastAPI + Uvicorn with clean async route handlers.
-- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS pre-compiled into static assets.
+- **Backend**: FastAPI + Uvicorn with clean route handlers and `ruff` linting configured in `pyproject.toml`.
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + Vitest (`frontend/vitest.config.ts`) pre-compiled into `frontend/dist/`.
 - **Version Control**: Completely isolated inside `D:\AI_video_generation\GoogleSheet_UI_auditor/.git`.
 

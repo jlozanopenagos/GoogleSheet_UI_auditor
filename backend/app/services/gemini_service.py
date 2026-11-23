@@ -6,14 +6,13 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, Any, List, Tuple
-import requests
+from typing import Dict, Any, Tuple
 
 from ..core.config import settings
 from ..core.routing import parse_and_route_id, ParsedId
 from ..models.schemas import GeminiGenerateResponse
 from .prompt_service import PromptService
-from .gemini_auditor import gemini_auditor, GeminiAuditor, GeminiAuditorError, EMOJI_PATTERN
+from .gemini_auditor import gemini_auditor, GeminiAuditor, GeminiAuditorError
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class GeminiService:
         Generates an optimized YouTube Shorts SEO description via Gemini API
         routed through the GeminiAuditor for multi-model fallback, 3-attempt retry,
         token-truncation protection, and post-generation quality auditing.
-        
+
         Raises:
             GeminiServiceError: If API key is missing, script is blank, or Gemini calls fail after retries.
         """

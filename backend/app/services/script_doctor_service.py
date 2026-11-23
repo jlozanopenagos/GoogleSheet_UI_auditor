@@ -5,10 +5,7 @@ script_doctor_service.py — Audited, High-Variety System Prompts & Gemini Scrip
 from __future__ import annotations
 
 import logging
-import re
-import time
-from typing import Dict, Any, List, Tuple
-import requests
+from typing import Dict, Any, Tuple
 
 from ..core.config import settings
 from ..core.routing import parse_and_route_id, ParsedId
@@ -76,7 +73,7 @@ CRITICAL PRODUCTION RULES:
 
 2. LOGICAL COHERENCE & CHALLENGE TYPES (CRITICAL RULE — SCRIPTS MUST MAKE SENSE!):
    Identify the actual linguistic problem being tested and choose the matching logical structure. Characters must NEVER say absurd, impossible sentences (e.g. a bakery cashier asking to "climb a dry desert" is absurd nonsense!).
-   
+
    • TYPE A: GRAMMAR, SYNTAX & WORD CHOICE (e.g. bored vs boring, make vs do, in vs on, prepositions, tenses):
      - The setup: An authentic character speaks a realistic sentence that needs the right word.
      - The challenge: Ask which word or phrase correctly completes their thought. Multiple choice (A vs B, or A vs B vs C) is welcome and encouraged!

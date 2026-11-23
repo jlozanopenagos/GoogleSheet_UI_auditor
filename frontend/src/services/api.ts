@@ -184,3 +184,28 @@ export async function unscheduleCalendarId(scriptId: string): Promise<any> {
 
   return json.data;
 }
+
+export async function syncCalendarFromSheets(
+  month?: string,
+  language?: string
+): Promise<
+  CalendarEntriesData & {
+    synced_added: number;
+    tabs_checked: number;
+    errors: string[];
+  }
+> {
+  const params = new URLSearchParams();
+  if (month) params.set('month', month);
+  if (language && language !== 'all') params.set('language', language);
+  const qs = params.toString();
+
+  const resp = await fetch(`${API_BASE}/calendar/sync${qs ? `?${qs}` : ''}`, {
+    method: 'POST',
+  });
+  const json: ApiResponse & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to sync Launch Calendar from Google Sheets.');
+  }
+  return json.data;
+}

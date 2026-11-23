@@ -4,7 +4,6 @@ prompt_service.py — Strategy-Pattern YouTube Shorts SEO Description Prompts (S
 
 from __future__ import annotations
 
-from typing import Dict
 
 
 LANGUAGE_NAMES = {
@@ -57,7 +56,7 @@ CRITICAL PRODUCTION INVARIANTS:
 6. OUTPUT PURITY: Output ONLY the final description text with hashtags. Strictly NO introductory labels ("Here is the description:"), NO quotes, and NO markdown commentary."""
 
         if vtype == "expression":
-            type_specific = f"""
+            type_specific = """
 ==================================================
 FORMAT FOCUS: EXPRESSION (Idiomatic Nuances & Conversational Traps)
 ==================================================
@@ -66,7 +65,7 @@ FORMAT FOCUS: EXPRESSION (Idiomatic Nuances & Conversational Traps)
 - Retention Driver: Tease how native speakers actually react and what the correct insider phrase is without spoiling it."""
 
         elif vtype == "game":
-            type_specific = f"""
+            type_specific = """
 ==================================================
 FORMAT FOCUS: GAME (Interactive Trivia & Ear/Grammar Challenge)
 ==================================================
@@ -75,7 +74,7 @@ FORMAT FOCUS: GAME (Interactive Trivia & Ear/Grammar Challenge)
 - Retention Driver: Challenge the viewer to pick their answer before the timer or reveal unlocks the secret."""
 
         elif vtype == "roleplay":
-            type_specific = f"""
+            type_specific = """
 ==================================================
 FORMAT FOCUS: ROLEPLAY (Relatable Character Banter & Dialogue Drama)
 ==================================================
@@ -84,7 +83,7 @@ FORMAT FOCUS: ROLEPLAY (Relatable Character Banter & Dialogue Drama)
 - Retention Driver: Tease how the misunderstanding gets resolved or flipped by the final line."""
 
         elif vtype == "fun_facts":
-            type_specific = f"""
+            type_specific = """
 ==================================================
 FORMAT FOCUS: FUN_FACTS (Linguistic Discoveries & Surprising Origins)
 ==================================================
@@ -93,7 +92,7 @@ FORMAT FOCUS: FUN_FACTS (Linguistic Discoveries & Surprising Origins)
 - Retention Driver: Tease the unexpected backstory that permanently changes how viewers see the expression."""
 
         else:
-            type_specific = f"""
+            type_specific = """
 FORMAT FOCUS: General Short
 - Deliver a high-energy hook, compelling middle retention driver, and lively comment CTA anchored in the script."""
 

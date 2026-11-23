@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 import requests
 
 from ..core.config import settings

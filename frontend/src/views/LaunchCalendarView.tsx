@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,6 +14,7 @@ import {
   Rocket,
   Layers,
   ShieldCheck,
+  X,
 } from 'lucide-react';
 import {
   ActiveTab,
@@ -26,8 +27,62 @@ import {
   checkCalendarId,
   fetchCalendarEntries,
   scheduleCalendarId,
+  syncCalendarFromSheets,
   unscheduleCalendarId,
 } from '../services/api';
+
+const LANGUAGE_ORDER = ['english', 'french', 'spanish', 'italian'] as const;
+const TYPE_ORDER = ['fun_facts', 'expression', 'game', 'roleplay'] as const;
+
+const LANG_META: Record<
+  string,
+  {
+    code: string;
+    label: string;
+    flag: string;
+    rowClass: string;
+    codeClass: string;
+    dotClass: string;
+    filterActiveClass: string;
+  }
+> = {
+  english: {
+    code: 'EN',
+    label: 'English',
+    flag: '🇬🇧',
+    rowClass: 'bg-blue-500/10 border-l-[3px] border-l-blue-400 border-y border-r border-blue-500/20',
+    codeClass: 'text-blue-300',
+    dotClass: 'bg-blue-400',
+    filterActiveClass: 'bg-blue-600/80 text-white border border-blue-400/60 shadow-sm',
+  },
+  french: {
+    code: 'FR',
+    label: 'French',
+    flag: '🇫🇷',
+    rowClass: 'bg-violet-500/10 border-l-[3px] border-l-violet-400 border-y border-r border-violet-500/20',
+    codeClass: 'text-violet-300',
+    dotClass: 'bg-violet-400',
+    filterActiveClass: 'bg-violet-600/80 text-white border border-violet-400/60 shadow-sm',
+  },
+  spanish: {
+    code: 'ES',
+    label: 'Spanish',
+    flag: '🇪🇸',
+    rowClass: 'bg-amber-500/10 border-l-[3px] border-l-amber-400 border-y border-r border-amber-500/20',
+    codeClass: 'text-amber-300',
+    dotClass: 'bg-amber-400',
+    filterActiveClass: 'bg-amber-600/80 text-white border border-amber-400/60 shadow-sm',
+  },
+  italian: {
+    code: 'IT',
+    label: 'Italian',
+    flag: '🇮🇹',
+    rowClass: 'bg-emerald-500/10 border-l-[3px] border-l-emerald-400 border-y border-r border-emerald-500/20',
+    codeClass: 'text-emerald-300',
+    dotClass: 'bg-emerald-400',
+    filterActiveClass: 'bg-emerald-600/80 text-white border border-emerald-400/60 shadow-sm',
+  },
+};
 
 const LANGUAGES = [
   { id: 'all', label: 'All languages', flag: '🌐' },
@@ -46,33 +101,70 @@ const LANG_FLAGS: Record<string, string> = {
 
 const TYPE_META: Record<
   string,
-  { code: string; label: string; pillClass: string; badgeClass: string }
+  { code: string; label: string; badgeClass: string; dotClass: string }
 > = {
   fun_facts: {
     code: 'F',
     label: 'Fun Facts',
-    pillClass: 'bg-violet-600/35 text-violet-100 border-violet-400/60 hover:bg-violet-600/50',
-    badgeClass: 'bg-fuchsia-500/30 text-fuchsia-200 border-fuchsia-400/40',
+    badgeClass: 'bg-fuchsia-500/25 text-fuchsia-300 border-fuchsia-400/60',
+    dotClass: 'bg-fuchsia-400',
   },
   expression: {
     code: 'E',
     label: 'Expression',
-    pillClass: 'bg-violet-600/30 text-violet-100 border-violet-400/55 hover:bg-violet-600/45',
-    badgeClass: 'bg-sky-500/25 text-sky-200 border-sky-400/40',
+    badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-400/50',
+    dotClass: 'bg-sky-400',
   },
   game: {
     code: 'G',
     label: 'Game',
-    pillClass: 'bg-purple-600/30 text-purple-100 border-purple-400/55 hover:bg-purple-600/45',
-    badgeClass: 'bg-amber-500/25 text-amber-200 border-amber-400/40',
+    badgeClass: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50',
+    dotClass: 'bg-yellow-400',
   },
   roleplay: {
     code: 'R',
     label: 'Roleplay',
-    pillClass: 'bg-indigo-600/35 text-indigo-100 border-indigo-400/55 hover:bg-indigo-600/50',
-    badgeClass: 'bg-emerald-500/25 text-emerald-200 border-emerald-400/40',
+    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-400/50',
+    dotClass: 'bg-rose-400',
   },
 };
+
+function groupDayEntriesByLanguage(dayItems: CalendarEntry[]) {
+  const byLang: Record<string, CalendarEntry[]> = {};
+  for (const item of dayItems) {
+    const langKey = (item.language || '').toLowerCase();
+    if (!byLang[langKey]) byLang[langKey] = [];
+    byLang[langKey].push(item);
+  }
+
+  const orderedLangs = [
+    ...LANGUAGE_ORDER.filter((l) => byLang[l]?.length),
+    ...Object.keys(byLang).filter((l) => !(LANGUAGE_ORDER as readonly string[]).includes(l)),
+  ];
+
+  return orderedLangs.map((lang) => {
+    const sortedItems = [...byLang[lang]].sort((a, b) => {
+      const idxA = (TYPE_ORDER as readonly string[]).indexOf(a.video_type);
+      const idxB = (TYPE_ORDER as readonly string[]).indexOf(b.video_type);
+      const rankA = idxA === -1 ? 99 : idxA;
+      const rankB = idxB === -1 ? 99 : idxB;
+      return rankA !== rankB ? rankA - rankB : a.id.localeCompare(b.id);
+    });
+    return {
+      lang,
+      meta: LANG_META[lang] || {
+        code: lang.slice(0, 2).toUpperCase(),
+        label: lang,
+        flag: '🌐',
+        rowClass: 'bg-slate-500/10 border-l-[3px] border-l-slate-400 border-y border-r border-slate-500/20',
+        codeClass: 'text-slate-300',
+        dotClass: 'bg-slate-400',
+        filterActiveClass: 'bg-slate-600 text-white',
+      },
+      items: sortedItems,
+    };
+  });
+}
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -91,6 +183,17 @@ function formatShortDateLabel(isoDate: string): string {
   const parts = isoDate.split('-');
   if (parts.length !== 3) return isoDate;
   return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+}
+
+function formatFullDateHeading(isoDate: string): string {
+  const dt = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return isoDate;
+  return `${dt.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })} · ${formatShortDateLabel(isoDate)}`;
 }
 
 interface LaunchCalendarViewProps {
@@ -116,8 +219,10 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
 
   // Form / Scheduler state
+  const scriptIdInputRef = useRef<HTMLInputElement>(null);
   const [scriptIdInput, setScriptIdInput] = useState<string>('');
   const [selectedIsoDate, setSelectedIsoDate] = useState<string>(() => toIsoDate(new Date()));
+  const [inspectedIsoDate, setInspectedIsoDate] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState<boolean>(false);
   const [isScheduling, setIsScheduling] = useState<boolean>(false);
   const [preflight, setPreflight] = useState<(CalendarPreflightResult | CalendarScheduleResult) & { requires_override?: boolean; requires_readiness?: boolean } | null>(null);
@@ -134,6 +239,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
     triad_partial_days: 0,
   });
   const [isLoadingEntries, setIsLoadingEntries] = useState<boolean>(false);
+  const [isSyncingSheets, setIsSyncingSheets] = useState<boolean>(false);
 
   const activeMonthKey = useMemo(() => toMonthKey(viewDate), [viewDate]);
 
@@ -148,6 +254,26 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
       onError(err.message || 'Failed to load Launch Calendar.');
     } finally {
       setIsLoadingEntries(false);
+    }
+  };
+
+  const handleSyncFromSheets = async () => {
+    setIsSyncingSheets(true);
+    try {
+      const monthParam = viewMode === 'month' ? activeMonthKey : undefined;
+      const data = await syncCalendarFromSheets(monthParam, selectedLanguage);
+      setEntries(data.entries || []);
+      setSummary(data.summary);
+      onCalendarChanged?.();
+      if (data.errors && data.errors.length > 0) {
+        onError(`Synced ${data.synced_added} new entry(s), with ${data.errors.length} tab warning(s).`);
+      } else {
+        onSuccess(`Synced from Google Sheets: ${data.synced_added} new entry(s) imported.`);
+      }
+    } catch (err: any) {
+      onError(err.message || 'Failed to sync Launch Calendar from Google Sheets.');
+    } finally {
+      setIsSyncingSheets(false);
     }
   };
 
@@ -248,6 +374,27 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
     }
     return map;
   }, [entries]);
+
+  const inspectedDayItems = useMemo(
+    () => (inspectedIsoDate ? entriesByDate[inspectedIsoDate] || [] : []),
+    [entriesByDate, inspectedIsoDate]
+  );
+
+  const inspectedDayGroups = useMemo(
+    () => groupDayEntriesByLanguage(inspectedDayItems),
+    [inspectedDayItems]
+  );
+
+  useEffect(() => {
+    if (!inspectedIsoDate) return;
+    const handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') {
+        setInspectedIsoDate(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inspectedIsoDate]);
 
   // Build calendar cells for Month or Week grid
   const calendarDays = useMemo(() => {
@@ -361,6 +508,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
               Script ID to Launch
             </label>
             <input
+              ref={scriptIdInputRef}
               type="text"
               value={scriptIdInput}
               onChange={(e) => setScriptIdInput(e.target.value.toUpperCase())}
@@ -607,21 +755,28 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
               Language:
             </span>
             <div className="flex flex-wrap items-center gap-1.5 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.id}
-                  type="button"
-                  onClick={() => setSelectedLanguage(lang.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    selectedLanguage === lang.id
-                      ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm'
-                      : 'text-slate-300 hover:text-white hover:bg-brand-surface'
-                  }`}
-                >
-                  <span>{lang.flag}</span>
-                  <span>{lang.label}</span>
-                </button>
-              ))}
+              {LANGUAGES.map((lang) => {
+                const lmeta = lang.id !== 'all' ? LANG_META[lang.id] : null;
+                const activeClass = lmeta
+                  ? lmeta.filterActiveClass
+                  : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm';
+                return (
+                  <button
+                    key={lang.id}
+                    type="button"
+                    onClick={() => setSelectedLanguage(lang.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      selectedLanguage === lang.id
+                        ? activeClass
+                        : 'text-slate-300 hover:text-white hover:bg-brand-surface'
+                    }`}
+                  >
+                    {lmeta && <span className={`w-2 h-2 rounded-full ${lmeta.dotClass}`} />}
+                    <span>{lang.flag}</span>
+                    <span>{lang.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -678,6 +833,17 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
 
             <button
               type="button"
+              onClick={handleSyncFromSheets}
+              disabled={isSyncingSheets || isLoadingEntries}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/30 hover:bg-violet-600/50 border border-violet-400/50 text-xs font-semibold text-violet-100 rounded-xl cursor-pointer disabled:opacity-50"
+              title="Pull scheduled IDs from all 16 Google Sheet tabs"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets ? 'animate-spin text-violet-300' : ''}`} />
+              <span>{isSyncingSheets ? 'Syncing...' : 'Sync from Sheets'}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={loadCalendar}
               disabled={isLoadingEntries}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-card hover:bg-brand-surface border border-brand-border text-xs font-semibold text-brand-ice rounded-xl cursor-pointer"
@@ -731,9 +897,44 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
       </div>
 
       {/* Dynamic Monthly / Weekly Calendar Grid */}
-      <div className="bg-brand-surface/60 border border-brand-border rounded-2xl p-4 sm:p-5 shadow-xl">
+      <div className="bg-brand-surface/60 border border-brand-border rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col gap-3">
+        {/* Orthogonal Language & Format Color Legend Bar */}
+        <div
+          aria-label="Calendar Color Legend"
+          className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 rounded-xl bg-brand-dark/70 border border-brand-border/60 text-[11px]"
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold uppercase tracking-wider text-brand-ice/50 text-[10px]">Languages:</span>
+            {LANGUAGE_ORDER.map((lang) => {
+              const lmeta = LANG_META[lang];
+              return (
+                <span key={lang} className="inline-flex items-center gap-1.5 font-semibold text-slate-200">
+                  <span className={`w-2 h-2 rounded-full ${lmeta.dotClass}`} />
+                  <span className={`mono-font font-bold ${lmeta.codeClass}`}>{lmeta.code}</span>
+                  <span className="text-brand-ice/60 hidden sm:inline">{lmeta.label}</span>
+                </span>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="font-bold uppercase tracking-wider text-brand-ice/50 text-[10px]">Types:</span>
+            {(['expression', 'game', 'roleplay', 'fun_facts'] as const).map((vt) => {
+              const tmeta = TYPE_META[vt];
+              return (
+                <span key={vt} className="inline-flex items-center gap-1 text-slate-200 font-semibold">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border mono-font ${tmeta.badgeClass}`}>
+                    {tmeta.code}
+                  </span>
+                  <span className="text-brand-ice/70">{tmeta.label}</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Weekday Column Headers */}
-        <div className="grid grid-cols-7 gap-2 mb-2">
+        <div className="grid grid-cols-7 gap-2">
           {WEEKDAYS.map((day) => (
             <div
               key={day}
@@ -750,116 +951,161 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
             const dayItems = entriesByDate[iso] || [];
             const isToday = iso === todayIso;
             const isSelectedDay = iso === selectedIsoDate;
-
-            // Group per language for clean slot badges (e.g. EN 3/3 E·G·R or ES 1/1 F)
-            const langSummaries = Object.entries(
-              dayItems.reduce<Record<string, Set<string>>>((acc, item) => {
-                if (!acc[item.language]) acc[item.language] = new Set();
-                acc[item.language].add(item.video_type);
-                return acc;
-              }, {})
-            );
+            const langGroups = groupDayEntriesByLanguage(dayItems);
+            const isCompactMonth = viewMode === 'month';
 
             return (
               <div
                 key={iso}
-                onClick={() => setSelectedIsoDate(iso)}
-                className={`min-h-[128px] rounded-xl p-2 border transition-all flex flex-col justify-between gap-2 cursor-pointer ${
+                data-testid={`calendar-day-${iso}`}
+                onClick={() => {
+                  setSelectedIsoDate(iso);
+                  setInspectedIsoDate(iso);
+                }}
+                className={`group/day ${isCompactMonth ? 'h-[144px] overflow-hidden' : 'min-h-[160px]'} rounded-xl p-2 border transition-all flex flex-col gap-1.5 cursor-pointer ${
                   !inCurrentMonth
                     ? 'bg-brand-dark/30 border-brand-border/30 opacity-45'
                     : isSelectedDay
-                    ? 'bg-brand-card border-violet-400/80 ring-1 ring-violet-400/40 shadow-lg shadow-violet-500/10'
+                    ? 'bg-brand-card border-brand-sky/80 ring-1 ring-brand-sky/40 shadow-lg shadow-sky-500/10'
                     : 'bg-brand-card/75 border-brand-border hover:border-brand-sky/50'
                 }`}
               >
-                {/* Day Header */}
-                <div className="flex items-center justify-between">
+                {/* Compact Day Header: Day # + Total Count + Quick Schedule Focus */}
+                <div className="flex items-center justify-between gap-1 shrink-0">
                   <span
-                    className={`text-xs font-bold mono-font px-1.5 py-0.5 rounded-md ${
+                    className={`text-xs font-bold mono-font px-1.5 py-0.5 rounded-md leading-none ${
                       isToday
                         ? 'bg-violet-600 text-white shadow-sm'
                         : isSelectedDay
-                        ? 'text-violet-300'
+                        ? 'text-brand-sky'
                         : 'text-slate-300'
                     }`}
                   >
                     {date.getDate()}
                   </span>
 
-                  <button
-                    type="button"
-                    title={`Select ${formatShortDateLabel(iso)} to schedule`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedIsoDate(iso);
-                    }}
-                    className="p-1 rounded-md text-brand-ice/40 hover:text-violet-200 hover:bg-violet-500/20 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Scheduled ID Pills */}
-                <div className="flex-1 flex flex-col gap-1">
-                  {dayItems.map((item) => {
-                    const tmeta = TYPE_META[item.video_type] || {
-                      code: '?',
-                      label: item.video_type,
-                      pillClass: 'bg-violet-600/30 text-violet-100 border-violet-400/50',
-                      badgeClass: 'bg-slate-600/30 text-slate-200 border-slate-400/40',
-                    };
-                    return (
-                      <div
-                        key={item.id}
-                        title={`${item.id}: ${item.expression || 'No title'}\n${item.language} · ${tmeta.label}\nLaunched ${item.sheet_date}\nClick ID to open in Script Auditor`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenIdInTab(item.id, 'script_auditor');
-                        }}
-                        className={`group flex items-center justify-between gap-1 px-1.5 py-1 rounded-lg border text-[11px] font-bold transition-all ${tmeta.pillClass}`}
+                  <div className="flex items-center gap-1">
+                    {dayItems.length > 0 && (
+                      <span
+                        title={`${dayItems.length} scheduled short(s) — click day to inspect`}
+                        className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold mono-font bg-brand-dark/80 text-brand-ice/80 border border-brand-border/70 leading-none"
                       >
-                        <div className="flex items-center gap-1 min-w-0">
-                          <span className="text-[10px]">{LANG_FLAGS[item.language] || ''}</span>
-                          <span className="mono-font truncate">{item.id}</span>
-                          <span className={`px-1 rounded text-[9px] border ${tmeta.badgeClass}`}>
-                            {tmeta.code}
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          title={`Unschedule ${item.id} (reverts Bingo card to Green)`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleUnschedule(item);
-                          }}
-                          className="opacity-60 group-hover:opacity-100 hover:text-rose-300 p-0.5 rounded transition-opacity cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                        {dayItems.length}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      title={`Select ${formatShortDateLabel(iso)} to schedule`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedIsoDate(iso);
+                        scriptIdInputRef.current?.focus();
+                      }}
+                      className="p-0.5 rounded-md text-brand-ice/35 opacity-70 group-hover/day:opacity-100 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Day Per-Language Slot Footer */}
-                {langSummaries.length > 0 && (
-                  <div className="pt-1 border-t border-brand-border/40 flex flex-wrap gap-1">
-                    {langSummaries.map(([lang, typesSet]) => {
-                      const hasF = typesSet.has('fun_facts');
-                      const triadCodes = ['expression', 'game', 'roleplay']
-                        .filter((t) => typesSet.has(t))
-                        .map((t) => TYPE_META[t].code);
-                      return (
+                {/* Day Body: Ultra-compact single-line micro-rows in Month, full chips in Week */}
+                {isCompactMonth ? (
+                  <div className="flex-1 flex flex-col gap-1 overflow-hidden">
+                    {langGroups.map(({ lang, meta: lmeta, items }) => (
+                      <div
+                        key={lang}
+                        data-testid={`day-${iso}-lang-${lmeta.code}`}
+                        title={`${lmeta.label}: ${items
+                          .map((it) => `${it.id} (${TYPE_META[it.video_type]?.label || it.video_type})`)
+                          .join(', ')}`}
+                        className={`rounded-md px-1.5 py-0.5 flex items-center justify-between gap-1 shrink-0 ${lmeta.rowClass}`}
+                      >
                         <span
-                          key={lang}
-                          className="text-[9px] mono-font px-1.5 py-0.5 rounded bg-brand-dark/80 text-violet-200/80 border border-violet-500/25"
+                          className={`inline-flex items-center gap-1 text-[10px] font-extrabold mono-font leading-none shrink-0 ${lmeta.codeClass}`}
                         >
-                          {LANG_FLAGS[lang]}{' '}
-                          {hasF ? `1/1 F${triadCodes.length ? `+${triadCodes.join('·')}` : ''}` : `${triadCodes.length}/3 ${triadCodes.join('·')}`}
+                          <span className="text-[9px]">{lmeta.flag}</span>
+                          <span>{lmeta.code}</span>
                         </span>
-                      );
-                    })}
+
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {items.map((item) => {
+                            const tmeta = TYPE_META[item.video_type] || {
+                              code: '?',
+                              label: item.video_type,
+                              badgeClass: 'bg-slate-600/30 text-slate-200 border-slate-400/40',
+                              dotClass: 'bg-slate-400',
+                            };
+                            return (
+                              <span
+                                key={item.id}
+                                title={`${item.id}: ${item.expression || 'No title'}`}
+                                className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-extrabold border mono-font leading-none ${tmeta.badgeClass}`}
+                              >
+                                {tmeta.code}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col gap-1">
+                    {langGroups.map(({ lang, meta: lmeta, items }) => (
+                      <div
+                        key={lang}
+                        data-testid={`day-${iso}-lang-${lmeta.code}`}
+                        className={`rounded-lg px-1.5 py-1 flex flex-col gap-1 ${lmeta.rowClass}`}
+                      >
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-extrabold mono-font leading-none ${lmeta.codeClass}`}
+                        >
+                          <span>{lmeta.flag}</span>
+                          <span>{lmeta.code}</span>
+                        </span>
+
+                        <div className="flex flex-wrap items-center gap-1">
+                          {items.map((item) => {
+                            const tmeta = TYPE_META[item.video_type] || {
+                              code: '?',
+                              label: item.video_type,
+                              badgeClass: 'bg-slate-600/30 text-slate-200 border-slate-400/40',
+                              dotClass: 'bg-slate-400',
+                            };
+                            return (
+                              <div
+                                key={item.id}
+                                title={`${item.id}: ${item.expression || 'No title'}\n${lmeta.label} · ${tmeta.label}\nClick chip to open in Script Auditor`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenIdInTab(item.id, 'script_auditor');
+                                }}
+                                className="group/chip inline-flex items-center gap-1 px-1 py-0.5 rounded-md bg-brand-dark/85 border border-white/10 hover:border-white/30 text-[10px] font-bold text-slate-100 transition-colors cursor-pointer"
+                              >
+                                <span
+                                  className={`px-1 rounded text-[9px] font-extrabold border leading-tight ${tmeta.badgeClass}`}
+                                >
+                                  {tmeta.code}
+                                </span>
+                                <span className="mono-font tracking-tight">{item.id}</span>
+                                <button
+                                  type="button"
+                                  aria-label={`Unschedule ${item.id}`}
+                                  title={`Unschedule ${item.id} (reverts Bingo card to Green)`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUnschedule(item);
+                                  }}
+                                  className="opacity-0 group-hover/chip:opacity-100 focus:opacity-100 hover:text-rose-300 text-slate-400 transition-opacity cursor-pointer"
+                                >
+                                  <X className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -867,6 +1113,137 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
           })}
         </div>
       </div>
+
+      {/* Centered Click-to-Inspect Day Detail Pop-up Modal */}
+      {inspectedIsoDate && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => setInspectedIsoDate(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Day details for ${formatShortDateLabel(inspectedIsoDate)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-brand-surface border border-brand-border rounded-2xl p-5 shadow-2xl flex flex-col gap-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-border/60 pb-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h3 className="text-base font-extrabold text-white">
+                  {formatFullDateHeading(inspectedIsoDate)}
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold mono-font bg-brand-card text-brand-sky border border-brand-border">
+                  {inspectedDayItems.length} scheduled
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedIsoDate(inspectedIsoDate);
+                    setInspectedIsoDate(null);
+                    setTimeout(() => scriptIdInputRef.current?.focus(), 0);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-95 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Schedule ID on this day</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Close day details"
+                  onClick={() => setInspectedIsoDate(null)}
+                  className="p-1.5 rounded-xl bg-brand-card hover:bg-brand-dark border border-brand-border text-slate-300 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {inspectedDayGroups.length === 0 ? (
+              <div className="py-8 text-center flex flex-col items-center gap-2">
+                <p className="text-sm font-semibold text-brand-ice/70">
+                  No videos scheduled for this day yet.
+                </p>
+                <p className="text-xs text-brand-ice/45">
+                  Click "Schedule ID on this day" above to add a script to this date.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {inspectedDayGroups.map(({ lang, meta: lmeta, items }) => (
+                  <div key={lang} className={`rounded-xl p-3 flex flex-col gap-2 ${lmeta.rowClass}`}>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-extrabold mono-font ${lmeta.codeClass}`}
+                      >
+                        <span>{lmeta.flag}</span>
+                        <span>
+                          {lmeta.label} ({items.length})
+                        </span>
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      {items.map((item) => {
+                        const tmeta = TYPE_META[item.video_type] || {
+                          code: '?',
+                          label: item.video_type,
+                          badgeClass: 'bg-slate-600/30 text-slate-200 border-slate-400/40',
+                          dotClass: 'bg-slate-400',
+                        };
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-brand-dark/85 border border-white/10"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border mono-font shrink-0 ${tmeta.badgeClass}`}
+                              >
+                                {tmeta.code}
+                              </span>
+                              <span className="text-xs font-extrabold mono-font text-white shrink-0">
+                                {item.id}
+                              </span>
+                              <span className="text-xs text-brand-ice/75 truncate">
+                                {item.expression || 'Untitled script'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setInspectedIsoDate(null);
+                                  onOpenIdInTab(item.id, 'script_auditor');
+                                }}
+                                className="px-2 py-1 rounded-lg bg-brand-surface hover:bg-brand-card border border-brand-border text-[11px] font-semibold text-brand-sky cursor-pointer"
+                              >
+                                Open
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${item.id} from calendar`}
+                                title={`Unschedule ${item.id} (reverts Bingo card to Green)`}
+                                onClick={() => handleUnschedule(item)}
+                                className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

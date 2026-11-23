@@ -9,11 +9,9 @@ import logging
 from fastapi import APIRouter, HTTPException, Path
 
 from ..models.schemas import (
-    ScriptRecord,
     UpdateScriptRequest,
     UpdateDescriptionRequest,
     BatchUpdateReadyRequest,
-    MatrixCategoryResponse,
     ApiResponse
 )
 from ..core.routing import IdRoutingError
