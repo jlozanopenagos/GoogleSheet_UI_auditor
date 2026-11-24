@@ -3,7 +3,6 @@ run.py — Unified launcher for GoogleSheet_UI_auditor
 """
 
 import sys
-import os
 import argparse
 import webbrowser
 from pathlib import Path
@@ -38,7 +37,7 @@ def main():
 
     url = f"http://{args.host}:{args.port}"
     print("=" * 65)
-    print(f"  GoogleSheet_UI_auditor — Management Studio")
+    print("  GoogleSheet_UI_auditor — Management Studio (v1.0.0)")
     print(f"  Listening at: {url}")
     print("=" * 65)
 

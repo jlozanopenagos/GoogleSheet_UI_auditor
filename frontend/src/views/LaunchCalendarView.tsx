@@ -47,7 +47,7 @@ const LANG_META: Record<
     code: 'EN',
     label: 'English',
     flag: '🇬🇧',
-    rowClass: 'bg-blue-500/10 border-l-[3px] border-l-blue-400 border-y border-r border-blue-500/20',
+    rowClass: 'bg-blue-500/15 border border-blue-400/30',
     codeClass: 'text-blue-300',
     dotClass: 'bg-blue-400',
   },
@@ -55,7 +55,7 @@ const LANG_META: Record<
     code: 'FR',
     label: 'French',
     flag: '🇫🇷',
-    rowClass: 'bg-violet-500/10 border-l-[3px] border-l-violet-400 border-y border-r border-violet-500/20',
+    rowClass: 'bg-violet-500/15 border border-violet-400/30',
     codeClass: 'text-violet-300',
     dotClass: 'bg-violet-400',
   },
@@ -63,7 +63,7 @@ const LANG_META: Record<
     code: 'ES',
     label: 'Spanish',
     flag: '🇪🇸',
-    rowClass: 'bg-amber-500/10 border-l-[3px] border-l-amber-400 border-y border-r border-amber-500/20',
+    rowClass: 'bg-amber-500/15 border border-amber-400/30',
     codeClass: 'text-amber-300',
     dotClass: 'bg-amber-400',
   },
@@ -71,7 +71,7 @@ const LANG_META: Record<
     code: 'IT',
     label: 'Italian',
     flag: '🇮🇹',
-    rowClass: 'bg-emerald-500/10 border-l-[3px] border-l-emerald-400 border-y border-r border-emerald-500/20',
+    rowClass: 'bg-emerald-500/15 border border-emerald-400/30',
     codeClass: 'text-emerald-300',
     dotClass: 'bg-emerald-400',
   },
@@ -149,7 +149,7 @@ function groupDayEntriesByLanguage(dayItems: CalendarEntry[]) {
         code: lang.slice(0, 2).toUpperCase(),
         label: lang,
         flag: '🌐',
-        rowClass: 'bg-slate-500/10 border-l-[3px] border-l-slate-400 border-y border-r border-slate-500/20',
+        rowClass: 'bg-slate-500/15 border border-slate-400/30',
         codeClass: 'text-slate-300',
         dotClass: 'bg-slate-400',
       },
@@ -873,11 +873,10 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
                       {dayItems.length > 0 && <span className="text-[11px] font-semibold tabular-nums text-brand-ice/80">{dayItems.length}<span className="hidden xl:inline"> {dayItems.length === 1 ? 'Short' : 'Shorts'}</span></span>}
                     </span>
                     {monthMode && (
-                      <span className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 px-1">
+                      <span className="mt-1 grid grid-cols-2 gap-0.5 sm:gap-1">
                         {groupDayEntriesByLanguage(dayItems).map(({ lang, meta, items }) => (
-                          <span key={lang} data-testid={`day-${iso}-lang-${meta.code}`} className={`flex items-center gap-1 text-[11px] font-semibold ${meta.codeClass}`}>
+                          <span key={lang} data-testid={`day-${iso}-lang-${meta.code}`} title={`${meta.label}: ${items.length} ${items.length === 1 ? 'Short' : 'Shorts'}`} className={`flex min-w-0 items-center justify-center gap-1 rounded px-0.5 py-0.5 text-[10px] font-semibold leading-none sm:justify-between sm:px-1.5 sm:text-[11px] ${meta.rowClass} ${meta.codeClass}`}>
                             <span className="hidden sm:inline">{meta.code}</span>
-                            <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full sm:hidden ${meta.dotClass}`} />
                             <span className="tabular-nums">{items.length}</span>
                           </span>
                         ))}
@@ -900,22 +899,28 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
                 {!monthMode && (
                   <div className="grid gap-3 px-3 pb-3 sm:grid-cols-2 lg:grid-cols-1">
                     {groupDayEntriesByLanguage(dayItems).map(({ lang, meta, items }) => (
-                      <div key={lang} data-testid={`day-${iso}-lang-${meta.code}`} className="min-w-0 border-t border-brand-border pt-2">
-                        <h3 className="flex items-center gap-1.5 text-xs font-semibold text-brand-ice/90">
+                      <div key={lang} data-testid={`day-${iso}-lang-${meta.code}`} className={`min-w-0 rounded-lg px-2 py-1.5 ${meta.rowClass}`}>
+                        <h3 className={`flex items-center gap-1.5 text-xs font-semibold ${meta.codeClass}`}>
                           <span aria-hidden="true" className={`h-2 w-2 rounded-full ${meta.dotClass}`} />{meta.label}
                         </h3>
                         <ul className="mt-1 space-y-0.5">
-                          {items.map((item) => (
-                            <li key={item.id} className="flex min-w-0 items-center gap-0.5">
-                              <button type="button" onClick={() => onOpenIdInTab(item.id, 'script_auditor')} aria-label={`${item.id} · ${TYPE_META[item.video_type]?.label || item.video_type}`} title={item.expression || item.id} className="min-w-0 flex-1 rounded px-1 py-1 text-left text-xs hover:bg-brand-card">
-                                <span className="font-semibold text-white">{item.id}</span>
-                                <span className="text-brand-ice/75"> · {TYPE_META[item.video_type]?.label || item.video_type}</span>
-                              </button>
-                              <button type="button" aria-label={`Unschedule ${item.id}`} onClick={() => handleUnschedule(item)} className="rounded p-1.5 text-brand-ice/75 hover:text-rose-300 lg:opacity-0 lg:group-hover/day:opacity-100 lg:group-focus-within/day:opacity-100">
-                                <X className="h-3 w-3" />
-                              </button>
-                            </li>
-                          ))}
+                          {items.map((item) => {
+                            const format = TYPE_META[item.video_type];
+                            return (
+                              <li key={item.id} className="flex min-w-0 items-center gap-0.5">
+                                <button type="button" onClick={() => onOpenIdInTab(item.id, 'script_auditor')} aria-label={`${item.id} · ${TYPE_META[item.video_type]?.label || item.video_type}`} title={item.expression || item.id} className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-0.5 py-1 text-left text-xs hover:bg-brand-dark/60">
+                                  {format && <span aria-hidden="true" className={`inline-grid h-4 w-4 shrink-0 place-items-center rounded border text-[9px] font-bold ${format.badgeClass}`}>{format.code}</span>}
+                                  <span className="min-w-0">
+                                    <span className="font-semibold text-white">{item.id}</span>
+                                    <span className="text-brand-ice/85"> · {format?.label || item.video_type}</span>
+                                  </span>
+                                </button>
+                                <button type="button" aria-label={`Unschedule ${item.id}`} onClick={() => handleUnschedule(item)} className="rounded p-1.5 text-brand-ice/75 hover:text-rose-300 lg:opacity-0 lg:group-hover/day:opacity-100 lg:group-focus-within/day:opacity-100">
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     ))}

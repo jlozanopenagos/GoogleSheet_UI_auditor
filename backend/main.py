@@ -13,15 +13,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 # pyrefly: ignore[missing-import]
 from fastapi.responses import FileResponse
-
+# pyrefly: ignore[missing-import]
 from app.core.config import settings
+# pyrefly: ignore[missing-import]
 from app.routers.sheets import router as sheets_router
+# pyrefly: ignore[missing-import]
 from app.routers.gemini import router as gemini_router
+# pyrefly: ignore[missing-import]
 from app.routers.calendar import router as calendar_router
 
 app = FastAPI(
     title="GoogleSheet UI Auditor API",
-    description="Standalone studio for Google Sheets script auditing, editing, and YouTube Shorts SEO description generation.",
+    description="Standalone v1.0 studio for Google Sheets script auditing, YouTube Shorts titles & Gemini SEO descriptions, ID checklist, and Launch Calendar.",
     version="1.0.0"
 )
 
@@ -45,6 +48,7 @@ def health_check():
     """Health probe reporting API status, configured endpoints, and Gemini readiness."""
     return {
         "status": "healthy",
+        "version": "1.0.0",
         "app": "GoogleSheet_UI_auditor",
         "master_webapp_configured": bool(settings.master_webapp_url),
         "gemini_configured": bool(settings.gemini_api_key),

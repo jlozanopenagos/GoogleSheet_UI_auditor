@@ -1,10 +1,10 @@
-# GoogleSheet_UI_auditor
+# GoogleSheet_UI_auditor (v1.0)
 
-A standalone, high-performance web application designed for rapid auditing, editing, and YouTube Shorts SEO description creation across 16 Google Sheets (4 languages × 4 video formats).
+A standalone, high-performance web studio engineered for rapid script auditing, YouTube Shorts title & SEO description creation, 4-state ID readiness tracking, and release scheduling across 16 Google Sheets (4 languages × 4 video formats).
 
 ---
 
-The auditor handles script review, descriptions, and release planning. Shorts Studio in the separate `shorts_automation` repository handles voice, image, thumbnail, and video production. The two apps share Google Sheets through Apps Script.
+The auditor handles editorial script review, Short titles (Column J), Gemini SEO descriptions (Column I), readiness tracking, and release planning. Shorts Studio in the separate `shorts_automation` repository handles voice, image, thumbnail, and video production. Both tools connect to the same 16 Google Sheets, while `GoogleSheet_UI_auditor` runs through its own **standalone Google Apps Script Web App** completely isolated from `shorts_automation`.
 
 ## Key Features
 
@@ -27,15 +27,19 @@ The auditor handles script review, descriptions, and release planning. Shorts St
      - **Column E Checkbox (`script_ready`)**: Toggleable only when script content is edited.
      - **Column F Date Input (`script_date`)**: Formatted strictly as `DD/MM/YY` (e.g. `31/01/26`).
 
-3. **Tab 2: Description Creation & Gemini SEO Engine**:
+3. **Tab 2: Title & Description (Columns J & I)**:
    - Shared ID search bar and active script context.
+   - **Short Title Card (Column J)** *(always visible for the selected ID)*:
+     - Shows whether a title is already saved in Column J (`Title saved` vs `No saved title`).
+     - Supports manual input/editing, non-empty validation, 1-click **Copy title**, and a live `100`-character YouTube title length counter (with amber warning if > 100 chars).
+     - Saves directly to Column J (`short_title`) via **Save title**.
    - **When Column I has content**:
      - Left box: Current Column I (`short_description`), read-only with copy button.
      - Right box: Editable Column I + Save button.
    - **When Column I is empty**:
      - Shows two centered actions:
-       1. **Create a new description**: Manual entry card with immediate save action.
-       2. **Gemini creation**: Consumes Google Gemini AI to synthesize a viral, format-specific YouTube Shorts description.
+       1. **Write description manually**: Manual entry card with immediate save action.
+       2. **Generate with Gemini**: Consumes Google Gemini AI to synthesize a viral, format-specific YouTube Shorts description.
    - **Gemini SEO Invariants & 3-Beat Architecture**:
      - Specialized system prompts per format (`EXPRESSION`, `GAME`, `ROLEPLAY`, `FUN_FACTS`).
      - **Rich 3-Beat Pacing (60–90 words, 350–500 characters)**:
@@ -55,6 +59,7 @@ The auditor handles script review, descriptions, and release planning. Shorts St
      - **Green**: Ready to launch (Column D script revision + Column I SEO description both filled).
      - **Yellow**: Script revision ready (Column D filled), needs SEO description (Column I empty).
      - **Grey**: Script revision (Column D) empty.
+   - Displays informational **Column J (`short_title`)** status (`Col J (Title): ✓ Filled / ✗ Empty`), title preview, and title search in the quick-inspection banner and tile tooltips without altering the 4-state lifecycle colors.
    - Clicking a Green card exposes a 1-click **"Schedule in Calendar"** button; clicking a Violet card shows its launch date and **"View / Move in Calendar"**.
 
 5. **Tab 4: Launch Calendar (Dynamic YouTube Release Tracker)**:
@@ -95,6 +100,8 @@ Optional flags:
 python run.py --port 8080 --no-browser
 ```
 
+> **Troubleshooting Port `8005` (`WinError 10048`)**: If `py run.py` fails to bind because `127.0.0.1:8005` is already in use, an older instance of the studio is still running in the background. Either launch on another port (`py run.py --port 8006`) or stop the existing `python.exe` process holding port `8005` before restarting.
+
 ---
 
 ## Directory Architecture
@@ -120,9 +127,9 @@ GoogleSheet_UI_auditor/
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── vitest.config.ts
-├── apps_script/                # Enhanced Code.gs for Google Sheets Web App deployment
-│   ├── Code.gs                 # Full Apps Script code (reading A-I, updating D, E, F, G, H, I in place)
-│   └── README.md               # 2-minute deployment guide
+├── apps_script/                # Standalone auditor-only Google Apps Script Web App
+│   ├── Code.gs                 # Reads A-J; explicit doPost actions (update_script, update_description, update_title, update_launch, batch_update)
+│   └── README.md               # 2-minute standalone deployment guide
 ├── tests/                      # Layered quality suite (isolated offline by conftest.py)
 │   ├── unit/                   # Routing, prompts, Gemini, Script Doctor, Calendar, SheetService
 │   ├── api/                    # FastAPI TestClient router contract tests
@@ -143,12 +150,12 @@ GoogleSheet_UI_auditor/
 
 ## Google Apps Script Deployment
 
-To ensure Google Sheets reads Column I (`short_description`), formats dates as `DD/MM/YY`, and performs in-place cell updates for Columns D, E, F, G (`video_ready`), H (`video_date`), and I:
+`GoogleSheet_UI_auditor` uses its own standalone Apps Script project (separate from `shorts_automation`) to read Columns A–J, auto-initialize Column I (`short_description`) and Column J (`short_title`) headers, format dates as plain-text `DD/MM/YY`, and handle explicit in-place updates (`update_script`, `update_description`, `update_title`, `update_launch`, `batch_update`):
 
-1. Open your Google Sheet(s).
-2. Go to **Extensions > Apps Script**.
-3. Replace `Code.gs` with the code in [`apps_script/Code.gs`](./apps_script/Code.gs).
-4. Save (💾) and click **Deploy > Manage deployments > Edit > New version > Deploy**.
+1. Go to [script.google.com](https://script.google.com/) and create (or open) your standalone `GoogleSheet_UI_auditor_WebApp` project.
+2. Replace `Code.gs` with the contents of [`apps_script/Code.gs`](./apps_script/Code.gs) and save (`Ctrl + S`).
+3. Click **Deploy > New deployment** (or **Deploy > Manage deployments > Edit > New version > Deploy**).
+4. Set `SHEETS_MASTER_WEBAPP_URL` in `.env` to that Web App URL.
 5. See [`apps_script/README.md`](./apps_script/README.md) for full instructions.
 
 ---

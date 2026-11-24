@@ -29,21 +29,32 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
   const [isUpdatingTitle, setIsUpdatingTitle] = useState(false);
   const [titleCopied, setTitleCopied] = useState(false);
 
-  // Sync state when script changes
+  // Reset transient mode flags when switching script ID
+  useEffect(() => {
+    if (script) {
+      setManualModeActive(false);
+      setGeminiResult(null);
+      setTitleCopied(false);
+    }
+  }, [script?.ID]);
+
+  // Sync Column I description when ID or fetched description changes
   useEffect(() => {
     if (script) {
       const initialVal = script.short_description || '';
       setInitialDescription(initialVal);
       setDescription(initialVal);
-      setManualModeActive(false);
-      setGeminiResult(null);
+    }
+  }, [script?.ID, script?.short_description]);
 
+  // Sync Column J title when ID or fetched title changes
+  useEffect(() => {
+    if (script) {
       const initialTitleVal = script.short_title || '';
       setInitialTitle(initialTitleVal);
       setShortTitle(initialTitleVal);
-      setTitleCopied(false);
     }
-  }, [script?.ID]);
+  }, [script?.ID, script?.short_title]);
 
   if (!script) {
     return (

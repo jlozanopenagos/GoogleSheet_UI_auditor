@@ -1,16 +1,16 @@
-# AGENTS.md — System Guidelines & Operational Architecture
+# AGENTS.md — System Guidelines & Operational Architecture (v1.0)
 
 ## 1. Project Context & Purpose
 
-`GoogleSheet_UI_auditor` is an independent, high-performance web studio engineered to inspect, audit, modify, and enrich YouTube Shorts video scripts and metadata across 16 Google Sheets (4 languages × 4 video formats).
+`GoogleSheet_UI_auditor` (v1.0) is an independent, high-performance web studio engineered to inspect, audit, modify, and enrich YouTube Shorts video scripts, titles, descriptions, and launch schedules across 16 Google Sheets (4 languages × 4 video formats).
 
-This repository owns editorial review, descriptions, readiness, and release scheduling. Shorts Studio and ComfyUI run separately. Always run the full quality gate — `.venv\Scripts\python.exe tests/run_tests.py --layer all --check-static` (backend static checks + `unit`, `api`, `integration`, and `contract` suites) and `cd frontend; npm.cmd run test` (Vitest UI/API suite) — before finishing changes. Preserve mocked Sheets and Gemini boundaries in offline tests and keep the checked-in production frontend bundle (`frontend/dist/`) in sync with frontend source changes.
+This repository owns editorial review, Short titles (Column J), descriptions (Column I), readiness, and release scheduling. Shorts Studio and ComfyUI run separately, and `apps_script/Code.gs` is deployed as a **standalone auditor-only Web App** isolated from `shorts_automation`. Always run the full quality gate — `.venv\Scripts\python.exe tests/run_tests.py --layer all --check-static` (backend static checks + `unit`, `api`, `integration`, and `contract` suites) and `cd frontend; npm.cmd run test` (Vitest UI/API suite) — before finishing changes. Preserve mocked Sheets and Gemini boundaries in offline tests and keep the checked-in production frontend bundle (`frontend/dist/`) in sync with frontend source changes.
 
 Instead of manually navigating multiple Google Sheets files in a browser, creators use this standalone tool to:
 1. Instantly navigate to any script by canonical ID (e.g., `EF01`, `SR04`).
 2. Compare original script narration (Column C) against edited revisions (Column D).
 3. Update modified scripts in Google Sheets in-place alongside readiness flags (Column E) and scheduled dates (Column F in `DD/MM/YY` format).
-4. Inspect, author, or generate viral, SEO-optimized YouTube Shorts descriptions (Column I) using Google Gemini AI tailored strictly per video type with zero spoilers and zero emojis.
+4. Inspect, author, and copy YouTube Shorts titles (Column J, `short_title`) alongside viral, SEO-optimized YouTube Shorts descriptions (Column I) generated via Google Gemini AI tailored strictly per video type with zero spoilers and tasteful emojis (1–3 max).
 
 ---
 
@@ -24,11 +24,11 @@ Instead of manually navigating multiple Google Sheets files in a browser, creato
 2. **Open/Closed Principle (OCP)**:
    - Format prompt strategies are decoupled into modular strategies (`ExpressionPromptStrategy`, `GamePromptStrategy`, `RoleplayPromptStrategy`, `FunFactsPromptStrategy`), allowing easy addition of new content types or tuning without touching the orchestration engine.
 3. **Liskov Substitution & Interface Segregation (LSP / ISP)**:
-   - Clean, strict Pydantic models (`ScriptRecord`, `UpdateScriptPayload`, `UpdateDescriptionPayload`, `GeminiGeneratePayload`) ensure explicit data boundaries between frontend and backend.
+   - Clean, strict Pydantic models and TypeScript contracts (`ScriptRecord`, `UpdateScriptRequest`, `UpdateDescriptionRequest`, `UpdateTitleRequest`, `GeminiGenerateRequest`, `CalendarCheckRequest`, `CalendarScheduleRequest`) ensure explicit data boundaries between frontend and backend.
 4. **Don't Repeat Yourself (DRY)**:
-   - The frontend shares the canonical `IdSearchBar` component across Tab 1 (Script Auditor) and Tab 2 (Description Creation).
-   - The `DualContentEditor` component abstracts the side-by-side read-only vs. editable panel layout for both script revisions and description editing.
-   - Centralized status badges, date inputs, and error notifications.
+   - The frontend shares the canonical `IdSearchBar` component across Tab 1 (Script auditor) and Tab 2 (Title & description).
+   - `ScriptAuditorView` and `DescriptionCreationView` follow a consistent side-by-side read-only reference vs. editable panel layout with collapsible mobile reference drawers.
+   - Centralized status badges, date inputs, API fetch helpers (`frontend/src/services/api.ts`), and toast notifications (`NotificationToast`).
 
 ---
 
@@ -76,7 +76,7 @@ When the user submits an ID into the search bar:
 | **J** | `short_title` | Text | - | Editable Short Title card (non-empty) | Informational status & search |
 
 > [!IMPORTANT]
-> **Column I & J Auto-Initialization**: In sheets where Column I or Column J is currently unassigned or headerless, the standalone auditor Apps Script automatically writes `"short_description"` into row 1 of Column I and `"short_title"` into row 1 of Column J.
+> **Standalone Apps Script & Column I/J Auto-Initialization**: `apps_script/Code.gs` is a standalone Web App exclusively for `GoogleSheet_UI_auditor` (supporting only the 5 explicit `doPost` actions: `update_script`, `update_description`, `update_title`, `update_launch`, and `batch_update`, and rejecting unknown actions). In sheets where Column I or Column J is currently unassigned or headerless, it automatically writes `"short_description"` into row 1 of Column I and `"short_title"` into row 1 of Column J.
 
 ---
 
@@ -167,7 +167,7 @@ The Gemini system prompts are specialized per video format to follow 2026 YouTub
 | **Backend API** | `tests/api/` | FastAPI `TestClient` router contracts (`sheets`, `gemini`, `calendar`), HTTP status codes (`400`/`404`/`502`), and validation rules. |
 | **Backend Integration** | `tests/integration/` | Cross-service lifecycles (`Schedule -> Violet Bingo -> Move -> Unschedule -> Green Bingo -> Sync from Sheets`). |
 | **Apps Script Contract** | `tests/contract/` | Verifies `apps_script/Code.gs` handles all backend `doPost` actions, returns `updated_fields`, and enforces `.setNumberFormat("@")` on date cells. |
-| **Frontend Tests** | `frontend/src/__tests__/` | `vitest` + `@testing-library/react` tests for `services/api.ts`, `LaunchCalendarView.tsx`, and `IdChecklistView.tsx`. |
+| **Frontend Tests** | `frontend/src/__tests__/` | `vitest` + `@testing-library/react` tests for `services/api.ts`, `ScriptAuditorView.tsx`, `DescriptionCreationView.tsx`, `IdChecklistView.tsx`, and `LaunchCalendarView.tsx`. |
 
 - **Global Isolation Guardrails (`tests/conftest.py`)**: An `autouse` fixture isolates `CalendarService` to a per-test temp JSON file (protecting live `backend/data/launch_calendar.json`) and blocks accidental real outbound HTTP requests via `requests.Session.request` unless explicitly running `--live-smoke`.
 - **Unified Runner (`tests/run_tests.py`)**: Run `--layer {unit,api,integration,contract,all}`, `--check-static`, `--coverage`, or opt-in `--live-smoke` (harmless `ZZ999` probe verifying live Apps Script deployment).

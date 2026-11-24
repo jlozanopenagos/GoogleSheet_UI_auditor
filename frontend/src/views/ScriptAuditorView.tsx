@@ -20,21 +20,27 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
   const [copied, setCopied] = useState(false);
   const [initialScriptChanged, setInitialScriptChanged] = useState('');
   const [scriptChanged, setScriptChanged] = useState('');
+  const [initialScriptReady, setInitialScriptReady] = useState(false);
   const [scriptReady, setScriptReady] = useState(false);
+  const [initialScriptDate, setInitialScriptDate] = useState('');
   const [scriptDate, setScriptDate] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDoctoring, setIsDoctoring] = useState(false);
 
-  // Sync state when script changes
+  // Sync state when script or its fetched values change
   useEffect(() => {
     if (script) {
       const initialVal = script.SCRIPT_CHANGED || '';
+      const initialReady = script.script_ready || false;
+      const initialDate = script.script_date || '';
       setInitialScriptChanged(initialVal);
       setScriptChanged(initialVal);
-      setScriptReady(script.script_ready || false);
-      setScriptDate(script.script_date || '');
+      setInitialScriptReady(initialReady);
+      setScriptReady(initialReady);
+      setInitialScriptDate(initialDate);
+      setScriptDate(initialDate);
     }
-  }, [script?.ID]);
+  }, [script?.ID, script?.SCRIPT_CHANGED, script?.script_ready, script?.script_date]);
 
   if (!script) {
     return (
@@ -57,9 +63,11 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
     return `${lang} · ${vtype}`;
   };
 
-  // Check if content has been modified by the user
+  // Check if script text or production metadata (Col E / Col F) has been modified
   const hasScriptChanged = scriptChanged !== initialScriptChanged;
-  const isSaveEnabled = hasScriptChanged && !isUpdating && !isDoctoring;
+  const hasMetaChanged = scriptReady !== initialScriptReady || scriptDate !== initialScriptDate;
+  const hasUnsavedChanges = hasScriptChanged || hasMetaChanged;
+  const isSaveEnabled = hasUnsavedChanges && !isUpdating && !isDoctoring;
 
   // Natural placeholder text when Column D is empty
   const placeholderText = `Write or doctor the new version of the script for "${script.expression || script.ID}" here...`;
@@ -118,6 +126,8 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
         script_date: scriptDate,
       };
       setInitialScriptChanged(scriptChanged);
+      setInitialScriptReady(scriptReady);
+      setInitialScriptDate(scriptDate);
       onScriptUpdated(updated);
       onSuccess(`Successfully updated script revisions and status for ${script.ID} in Google Sheets.`);
     } catch (err: any) {
@@ -213,12 +223,12 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
         <div className="flex min-w-0 flex-col bg-brand-surface border border-brand-border rounded-xl p-4">
           <div className="flex items-center justify-between pb-3 border-b border-brand-border mb-3">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${hasScriptChanged ? 'bg-brand-sky animate-pulse' : 'bg-brand-amethyst'}`}></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${hasUnsavedChanges ? 'bg-brand-sky animate-pulse' : 'bg-brand-amethyst'}`}></span>
               <h3 className="font-bold text-sm text-white">
                 Script revision <span className="text-xs text-brand-sky font-normal">(editable)</span>
               </h3>
             </div>
-            {hasScriptChanged && (
+            {hasUnsavedChanges && (
               <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-brand-wine text-brand-ice border border-brand-mulberry">
                 Unsaved edits
               </span>
@@ -311,7 +321,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
             </div>
 
             <div className="editor-actions sticky bottom-0 z-20 bg-brand-surface py-2">
-            <p role="status" className="mb-1 text-xs text-brand-ice/80">{hasScriptChanged ? 'Unsaved changes' : 'No unsaved changes'}</p>
+            <p role="status" className="mb-1 text-xs text-brand-ice/80">{hasUnsavedChanges ? 'Unsaved changes' : 'No unsaved changes'}</p>
             <button
               onClick={handleSave}
               disabled={!isSaveEnabled}
@@ -335,7 +345,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
                 <>
                   <Save className="w-4 h-4" />
                   <span>
-                    {hasScriptChanged
+                    {hasUnsavedChanges
                       ? `Save revisions to Google Sheets (${script.ID})`
                       : 'No changes to save'}
                   </span>
