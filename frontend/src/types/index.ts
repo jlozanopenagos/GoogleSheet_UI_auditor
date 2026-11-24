@@ -9,6 +9,7 @@ export interface ScriptRecord {
   video_ready?: boolean;
   video_date?: string;
   short_description: string;
+  short_title: string;
   language: string;
   video_type: string;
   sheet_url?: string;
@@ -24,6 +25,11 @@ export interface UpdateScriptPayload {
 export interface UpdateDescriptionPayload {
   script_id: string;
   short_description: string;
+}
+
+export interface UpdateTitlePayload {
+  script_id: string;
+  short_title: string;
 }
 
 export interface GeminiGeneratePayload {
@@ -74,6 +80,8 @@ export interface MatrixItem {
   launch_date_iso?: string;
   has_script_changed: boolean;
   has_short_description: boolean;
+  short_title?: string;
+  has_short_title?: boolean;
   status: MatrixStatus;
 }
 

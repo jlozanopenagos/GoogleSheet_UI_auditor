@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   fetchScriptById,
+  updateTitleField,
   scheduleCalendarId,
   syncCalendarFromSheets,
 } from '../services/api';
@@ -91,5 +92,32 @@ describe('API service client', () => {
     );
     expect(data.synced_added).toBe(3);
     expect(data.tabs_checked).toBe(16);
+  });
+
+  it('updateTitleField posts to update-title endpoint and throws on error responses', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'Updated title',
+        data: { id: 'EE01', short_title: 'My Short Title' },
+      }),
+    });
+
+    const data = await updateTitleField({ script_id: 'EE01', short_title: 'My Short Title' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/sheets/script/EE01/update-title', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script_id: 'EE01', short_title: 'My Short Title' }),
+    });
+    expect(data.short_title).toBe('My Short Title');
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ detail: 'Short title cannot be empty.' }),
+    });
+    await expect(updateTitleField({ script_id: 'EE01', short_title: '' })).rejects.toThrow(
+      'Short title cannot be empty.'
+    );
   });
 });

@@ -87,6 +87,7 @@ class SheetService:
             video_ready=bool(matching_row.get("video_ready") is True or matching_row.get("video_ready") == "true"),
             video_date=str(matching_row.get("video_date") or "").strip(),
             short_description=str(matching_row.get("short_description") or matching_row.get("description") or "").strip(),
+            short_title=str(matching_row.get("short_title") or matching_row.get("title") or "").strip(),
             language=parsed.language,
             video_type=parsed.video_type,
             sheet_url=parsed.sheet_url
@@ -158,6 +159,44 @@ class SheetService:
             raise SheetServiceError(
                 "Google Sheet returned 'count: 0'. The Google Apps Script deployed in your Google Sheet is still running the old placeholder code! "
                 "Please deploy the updated Code.gs in Google Sheets (Extensions > Apps Script > Deploy > New version)."
+            )
+
+        return res
+
+    def update_title_field(
+        self,
+        script_id: str,
+        short_title: str
+    ) -> Dict[str, Any]:
+        """
+        Updates Column J (short_title) in place on Google Sheets. Requires non-empty text.
+        """
+        clean_title = str(short_title or "").strip()
+        if not clean_title:
+            raise ValueError("Short title cannot be empty.")
+
+        parsed: ParsedId = parse_and_route_id(script_id)
+
+        payload = {
+            "action": "update_title",
+            "spreadsheet_id": parsed.spreadsheet_id,
+            "gid": parsed.gid,
+            "script_id": parsed.canonical_id,
+            "short_title": clean_title,
+        }
+
+        logger.info(f"Updating short title for {parsed.canonical_id} in {parsed.spreadsheet_id} (gid={parsed.gid})")
+        res = self._http_post(self.master_url, payload)
+
+        if res.get("status") == "error":
+            raise SheetServiceError(f"Google Sheet error: {res.get('message', 'Unknown error')}")
+
+        if "updated_fields" not in res and (
+            res.get("count") == 0
+            or res.get("message") in ("Data processed successfully", "No rows provided")
+        ):
+            raise SheetServiceError(
+                "Google Sheet returned an unexpected empty response. Please deploy the updated standalone Code.gs for GoogleSheet_UI_auditor."
             )
 
         return res
@@ -279,9 +318,11 @@ class SheetService:
                 continue
             script_changed = str(r.get("SCRIPT_CHANGED") or r.get("new_script") or "").strip()
             short_desc = str(r.get("short_description") or r.get("description") or "").strip()
+            short_title = str(r.get("short_title") or r.get("title") or "").strip()
 
             has_script_changed = bool(script_changed)
             has_short_description = bool(short_desc)
+            has_short_title = bool(short_title)
             cal_entry = calendar_service.get_entry(raw_id)
             launch_date = cal_entry.get("sheet_date", "") if cal_entry else ""
             launch_date_iso = cal_entry.get("launch_date", "") if cal_entry else ""
@@ -314,6 +355,8 @@ class SheetService:
                 "launch_date_iso": launch_date_iso,
                 "has_script_changed": has_script_changed,
                 "has_short_description": has_short_description,
+                "short_title": short_title,
+                "has_short_title": has_short_title,
                 "status": status
             })
 

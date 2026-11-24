@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Path
 from ..models.schemas import (
     UpdateScriptRequest,
     UpdateDescriptionRequest,
+    UpdateTitleRequest,
     BatchUpdateReadyRequest,
     ApiResponse
 )
@@ -102,6 +103,39 @@ def update_description(
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         logger.exception(f"Unexpected error updating description {script_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.post("/script/{script_id}/update-title", response_model=ApiResponse)
+def update_title(
+    script_id: str,
+    payload: UpdateTitleRequest
+) -> ApiResponse:
+    """Updates Column J (short_title) in place on Google Sheets (non-empty required)."""
+    if payload.script_id.upper() != script_id.upper():
+        raise HTTPException(status_code=400, detail="Path script_id does not match payload script_id.")
+
+    clean_title = payload.short_title.strip()
+    if not clean_title:
+        raise HTTPException(status_code=400, detail="Short title cannot be empty.")
+
+    try:
+        result = sheet_service.update_title_field(
+            script_id=script_id,
+            short_title=clean_title
+        )
+        return ApiResponse(
+            success=True,
+            message=f"Successfully updated title for ID {script_id.upper()} in Google Sheet.",
+            data=result
+        )
+    except (IdRoutingError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except SheetServiceError as e:
+        logger.error(f"Title update error for {script_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Unexpected error updating title {script_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 

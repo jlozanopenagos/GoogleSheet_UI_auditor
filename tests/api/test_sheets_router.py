@@ -91,6 +91,45 @@ def test_update_description_endpoint_success_and_mismatch(mock_upd, api_client: 
     assert ok.json()["success"]
 
 
+@patch.object(SheetService, "update_title_field")
+def test_update_title_endpoint_success_and_validation(mock_upd, api_client: TestClient):
+    mismatch = api_client.post(
+        "/api/sheets/script/EE01/update-title",
+        json={"script_id": "EE02", "short_title": "Title"},
+    )
+    assert mismatch.status_code == 400
+
+    blank = api_client.post(
+        "/api/sheets/script/EE01/update-title",
+        json={"script_id": "EE01", "short_title": "   "},
+    )
+    assert blank.status_code == 400
+    mock_upd.assert_not_called()
+
+    mock_upd.return_value = {"status": "success", "id": "EE01", "updated_fields": ["short_title"]}
+    ok = api_client.post(
+        "/api/sheets/script/EE01/update-title",
+        json={"script_id": "EE01", "short_title": "  Punchy Short Title  "},
+    )
+    assert ok.status_code == 200
+    assert ok.json()["success"]
+    mock_upd.assert_called_once_with(script_id="EE01", short_title="Punchy Short Title")
+
+    mock_upd.side_effect = IdRoutingError("Invalid ID")
+    bad_id = api_client.post(
+        "/api/sheets/script/BAD99/update-title",
+        json={"script_id": "BAD99", "short_title": "Title"},
+    )
+    assert bad_id.status_code == 400
+
+    mock_upd.side_effect = SheetServiceError("Upstream failure")
+    upstream_err = api_client.post(
+        "/api/sheets/script/EE01/update-title",
+        json={"script_id": "EE01", "short_title": "Title"},
+    )
+    assert upstream_err.status_code == 502
+
+
 @patch.object(SheetService, "fetch_matrix_category")
 def test_get_matrix_endpoint_success_and_invalid_category(mock_matrix, api_client: TestClient):
     mock_matrix.return_value = {

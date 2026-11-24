@@ -2,6 +2,7 @@ import {
   ScriptRecord,
   UpdateScriptPayload,
   UpdateDescriptionPayload,
+  UpdateTitlePayload,
   GeminiGeneratePayload,
   GeminiGenerateResult,
   DoctorScriptPayload,
@@ -54,6 +55,24 @@ export async function updateDescriptionField(payload: UpdateDescriptionPayload):
   const json: ApiResponse = await resp.json();
   if (!resp.ok || !json.success) {
     throw new Error(json.message || json.error || 'Failed to update description.');
+  }
+
+  return json.data;
+}
+
+export async function updateTitleField(payload: UpdateTitlePayload): Promise<any> {
+  const resp = await fetch(`${API_BASE}/sheets/script/${encodeURIComponent(payload.script_id)}/update-title`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      script_id: payload.script_id,
+      short_title: payload.short_title,
+    }),
+  });
+
+  const json: ApiResponse & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to update title.');
   }
 
   return json.data;

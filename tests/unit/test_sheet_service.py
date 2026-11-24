@@ -26,6 +26,7 @@ def test_fetch_script_by_id_success_and_not_found(mock_get):
                 script="Original script for EE01",
                 script_changed="New script for EE01",
                 short_description="Curiosity description #Shorts #LearnEnglish",
+                short_title="Why natives say Break a Leg",
             ),
             make_sheet_row(cid="EE02", expression="Bite the bullet", script="Original script for EE02"),
         ],
@@ -37,6 +38,7 @@ def test_fetch_script_by_id_success_and_not_found(mock_get):
     assert record.expression == "Break a leg"
     assert record.SCRIPT_CHANGED == "New script for EE01"
     assert record.script_ready is True
+    assert record.short_title == "Why natives say Break a Leg"
 
     mock_get.return_value = {"status": "success", "count": 1, "data": [{"ID": "EE02"}]}
     with pytest.raises(ScriptNotFoundError):
@@ -57,10 +59,10 @@ def test_fetch_matrix_category_four_states(mock_get, cal_service: CalendarServic
         "status": "success",
         "count": 4,
         "data": [
-            make_sheet_row(cid="EE01", script_changed="New script", short_description="Desc #Shorts"),
-            make_sheet_row(cid="EE02", script_changed="Doctored script", short_description="", script_ready=False),
-            make_sheet_row(cid="EE03", script_changed="", short_description="", script_ready=False),
-            make_sheet_row(cid="EE04", script_changed="New script", short_description="Desc #Shorts"),
+            make_sheet_row(cid="EE01", script_changed="New script", short_description="Desc #Shorts", short_title="Title EE01"),
+            make_sheet_row(cid="EE02", script_changed="Doctored script", short_description="", short_title="", script_ready=False),
+            make_sheet_row(cid="EE03", script_changed="", short_description="", short_title="", script_ready=False),
+            make_sheet_row(cid="EE04", script_changed="New script", short_description="Desc #Shorts", short_title="Title EE04"),
         ],
     }
 
@@ -69,6 +71,13 @@ def test_fetch_matrix_category_four_states(mock_get, cal_service: CalendarServic
     assert result["count"] == 4
     statuses = {item["id"]: item["status"] for item in result["items"]}
     assert statuses == {"EE01": "green", "EE02": "yellow", "EE03": "grey", "EE04": "violet"}
+    titles = {item["id"]: (item["has_short_title"], item["short_title"]) for item in result["items"]}
+    assert titles == {
+        "EE01": (True, "Title EE01"),
+        "EE02": (False, ""),
+        "EE03": (False, ""),
+        "EE04": (True, "Title EE04"),
+    }
 
 
 @patch.object(SheetService, "_http_post")
@@ -87,6 +96,40 @@ def test_update_script_and_description_fields_and_undeployed_guard(mock_post):
     mock_post.return_value = {"status": "error", "message": "Sheet permission error"}
     with pytest.raises(SheetServiceError):
         service.update_description_field("EE01", "Desc")
+
+
+@patch.object(SheetService, "_http_post")
+def test_update_title_field_validation_and_responses(mock_post):
+    service = SheetService()
+
+    # Empty / whitespace-only title is rejected before HTTP call
+    with pytest.raises(ValueError, match="cannot be empty"):
+        service.update_title_field("EE01", "   ")
+    mock_post.assert_not_called()
+
+    # Valid title trims whitespace and sends action="update_title"
+    mock_post.return_value = {
+        "status": "success",
+        "id": "EE01",
+        "short_title": "Stop saying this!",
+        "updated_fields": ["short_title"],
+    }
+    res = service.update_title_field("ee01", "  Stop saying this!  ")
+    assert res["status"] == "success"
+    sent_payload = mock_post.call_args[0][1]
+    assert sent_payload["action"] == "update_title"
+    assert sent_payload["script_id"] == "EE01"
+    assert sent_payload["short_title"] == "Stop saying this!"
+
+    # Stale Apps Script deployment guard
+    mock_post.return_value = {"status": "success", "message": "No rows provided", "count": 0}
+    with pytest.raises(SheetServiceError):
+        service.update_title_field("EE01", "Valid title")
+
+    # Upstream error status
+    mock_post.return_value = {"status": "error", "message": "Write permission denied"}
+    with pytest.raises(SheetServiceError, match="Write permission denied"):
+        service.update_title_field("EE01", "Valid title")
 
 
 @patch.object(SheetService, "_http_post")

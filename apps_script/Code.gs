@@ -1,23 +1,28 @@
 /**
  * ==============================================================================
- * Google Apps Script: Enhanced Web App Endpoint for GoogleSheet_UI_auditor
+ * Google Apps Script: Standalone Web App EXCLUSIVELY for GoogleSheet_UI_auditor
  * ==============================================================================
- * 
+ *
+ * IMPORTANT: Deploy this script in its own dedicated standalone Apps Script
+ * project (separate from short-automation) so both systems stay completely
+ * decoupled.
+ *
  * Capabilities:
- * 1. doGet: Reads columns A through I (?id=<SPREADSHEET_ID>&gid=<TAB_GID>)
- *    - Automatically detects columns: ID, expression, script, SCRIPT_CHANGED,
- *      script_ready, script_date, video_ready, video_date, and short_description (Column I).
- *    - Guarantees Column I ("short_description") is present and mapped.
+ * 1. doGet: Reads columns A through J (?id=<SPREADSHEET_ID>&gid=<TAB_GID>)
+ *    - Automatically maps columns: ID, expression, script, SCRIPT_CHANGED,
+ *      script_ready, script_date, video_ready, video_date, short_description (Col I),
+ *      and short_title (Col J).
+ *    - Guarantees Column I ("short_description") and Column J ("short_title")
+ *      headers exist on Row 1.
  *    - Formats dates as DD/MM/YY (e.g. "31/01/26").
- * 
- * 2. doPost: In-place row updates by ID:
- *    - action: "update_script": Updates Column D (SCRIPT_CHANGED), Column E (script_ready),
- *      and Column F (script_date) for the matching ID in place.
- *    - action: "update_description": Updates Column I (short_description) in place.
- *    - action: "update_launch": Updates Column G (video_ready), Column H (video_date),
- *      and optionally Column E (script_ready) for YouTube launch calendar tracking.
- *    - Automatically resolves tabs by gid or tab name.
- * 
+ *
+ * 2. doPost: Explicit in-place row updates by ID (no legacy fallbacks):
+ *    - action: "update_script"      -> Updates Col D (SCRIPT_CHANGED), Col E (script_ready), Col F (script_date).
+ *    - action: "update_description" -> Updates Col I (short_description).
+ *    - action: "update_title"       -> Updates Col J (short_title, non-empty required).
+ *    - action: "update_launch"      -> Updates Col G (video_ready), Col H (video_date), and optionally Col E/F.
+ *    - action: "batch_update"       -> Bulk updates rows by ID.
+ *
  * ==============================================================================
  */
 
@@ -44,8 +49,8 @@ function doGet(e) {
       return createJsonResponse({ status: "error", message: "Sheet tab not found" }, 404);
     }
 
-    // 3. Ensure Column I header exists
-    ensureColumnIHeader(sheet);
+    // 3. Ensure Column I and Column J headers exist
+    ensureAuditorHeaders(sheet);
 
     // 4. Read sheet data
     var data = sheet.getDataRange().getValues();
@@ -80,7 +85,8 @@ function doGet(e) {
         script_date: colMap.script_date !== -1 ? formatCellDate(row[colMap.script_date]) : "",
         video_ready: colMap.video_ready !== -1 ? Boolean(row[colMap.video_ready]) : false,
         video_date: colMap.video_date !== -1 ? formatCellDate(row[colMap.video_date]) : "",
-        short_description: colMap.short_description !== -1 ? String(row[colMap.short_description] || "").trim() : ""
+        short_description: colMap.short_description !== -1 ? String(row[colMap.short_description] || "").trim() : "",
+        short_title: colMap.short_title !== -1 ? String(row[colMap.short_title] || "").trim() : ""
       };
 
       records.push(record);
@@ -131,20 +137,27 @@ function doPost(e) {
       return createJsonResponse({ status: "error", message: "Sheet tab not found" }, 404);
     }
 
-    // 3. Ensure Column I header exists
-    ensureColumnIHeader(sheet);
+    // 3. Ensure Column I and Column J headers exist
+    ensureAuditorHeaders(sheet);
 
-    var action = payload.action || "update_script";
+    var action = String(payload.action || "").trim();
     var actionResult;
 
     if (action === "update_script") {
       actionResult = handleUpdateScript(sheet, payload);
     } else if (action === "update_description") {
       actionResult = handleUpdateDescription(sheet, payload);
+    } else if (action === "update_title") {
+      actionResult = handleUpdateTitle(sheet, payload);
     } else if (action === "update_launch") {
       actionResult = handleUpdateLaunch(sheet, payload);
-    } else {
+    } else if (action === "batch_update") {
       actionResult = handleBatchUpdate(sheet, payload);
+    } else {
+      return createJsonResponse({
+        status: "error",
+        message: "Unsupported action: " + (action || "(missing)")
+      }, 400);
     }
 
     // Flush pending changes to ensure immediate persistence
@@ -167,7 +180,6 @@ function resolveSheetTab(ss, params1, params2) {
   var targetGid = p.gid || p2.gid;
   var tabName = p.sheet || p.tab || p2.sheet || p2.tab;
 
-  // Search by GID first if present
   if (targetGid !== undefined && targetGid !== null && String(targetGid).trim() !== "") {
     var allSheets = ss.getSheets();
     for (var s = 0; s < allSheets.length; s++) {
@@ -177,14 +189,26 @@ function resolveSheetTab(ss, params1, params2) {
     }
   }
 
-  // Search by Tab Name
   if (tabName && String(tabName).trim()) {
     var namedSheet = ss.getSheetByName(String(tabName).trim());
     if (namedSheet) return namedSheet;
   }
 
-  // Fallback to active or first sheet
   return ss.getActiveSheet() || ss.getSheets()[0];
+}
+
+/**
+ * Finds the 1-based Google Sheets row index matching targetId (case-insensitive), or -1.
+ */
+function findRowIndexById(data, colMap, targetId) {
+  var targetIdUpper = String(targetId || "").trim().toUpperCase();
+  for (var r = 1; r < data.length; r++) {
+    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
+    if (cellId === targetIdUpper) {
+      return r + 1;
+    }
+  }
+  return -1;
 }
 
 /**
@@ -204,17 +228,7 @@ function handleUpdateScript(sheet, payload) {
 
   var headers = data[0].map(function(h) { return String(h || "").trim(); });
   var colMap = resolveColumnIndexes(headers);
-
-  var targetIdUpper = targetId.toUpperCase();
-  var rowIndex = -1;
-
-  for (var r = 1; r < data.length; r++) {
-    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
-    if (cellId === targetIdUpper) {
-      rowIndex = r + 1; // 1-based index in Google Sheets
-      break;
-    }
-  }
+  var rowIndex = findRowIndexById(data, colMap, targetId);
 
   if (rowIndex === -1) {
     return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
@@ -251,22 +265,6 @@ function handleUpdateScript(sheet, payload) {
     updatedFields.push("script_date");
   }
 
-  // 4. Optional Column G & H launch sync if included
-  if (payload.video_ready !== undefined) {
-    var vReady = Boolean(
-      payload.video_ready === true ||
-      payload.video_ready === "true" ||
-      payload.video_ready === 1 ||
-      payload.video_ready === "1"
-    );
-    sheet.getRange(rowIndex, colMap.video_ready + 1).setValue(vReady);
-    updatedFields.push("video_ready");
-  }
-  if (payload.video_date !== undefined) {
-    sheet.getRange(rowIndex, colMap.video_date + 1).setValue(String(payload.video_date || "").trim());
-    updatedFields.push("video_date");
-  }
-
   return {
     status: "success",
     message: "Row " + rowIndex + " updated successfully for ID " + targetId,
@@ -293,17 +291,7 @@ function handleUpdateDescription(sheet, payload) {
 
   var headers = data[0].map(function(h) { return String(h || "").trim(); });
   var colMap = resolveColumnIndexes(headers);
-
-  var targetIdUpper = targetId.toUpperCase();
-  var rowIndex = -1;
-
-  for (var r = 1; r < data.length; r++) {
-    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
-    if (cellId === targetIdUpper) {
-      rowIndex = r + 1;
-      break;
-    }
-  }
+  var rowIndex = findRowIndexById(data, colMap, targetId);
 
   if (rowIndex === -1) {
     return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
@@ -322,7 +310,52 @@ function handleUpdateDescription(sheet, payload) {
     id: targetId,
     sheet_name: sheet.getName(),
     row_number: rowIndex,
-    short_description: description
+    short_description: description,
+    updated_fields: ["short_description"]
+  };
+}
+
+/**
+ * Updates Column J (short_title) in place for a single row identified by ID.
+ * Rejects empty/whitespace-only titles.
+ */
+function handleUpdateTitle(sheet, payload) {
+  var targetId = String(payload.script_id || payload.ID || payload.id || "").trim();
+  if (!targetId) {
+    return { status: "error", message: "Missing target ID in request payload" };
+  }
+
+  var title = String(
+    payload.short_title !== undefined ? payload.short_title :
+    (payload.title !== undefined ? payload.title : "")
+  ).trim();
+  if (!title) {
+    return { status: "error", message: "Short title cannot be empty" };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) {
+    return { status: "error", message: "Sheet contains no data rows" };
+  }
+
+  var headers = data[0].map(function(h) { return String(h || "").trim(); });
+  var colMap = resolveColumnIndexes(headers);
+  var rowIndex = findRowIndexById(data, colMap, targetId);
+
+  if (rowIndex === -1) {
+    return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
+  }
+
+  sheet.getRange(rowIndex, colMap.short_title + 1).setValue(title);
+
+  return {
+    status: "success",
+    message: "Title updated successfully for ID " + targetId,
+    id: targetId,
+    sheet_name: sheet.getName(),
+    row_number: rowIndex,
+    short_title: title,
+    updated_fields: ["short_title"]
   };
 }
 
@@ -343,17 +376,7 @@ function handleUpdateLaunch(sheet, payload) {
 
   var headers = data[0].map(function(h) { return String(h || "").trim(); });
   var colMap = resolveColumnIndexes(headers);
-
-  var targetIdUpper = targetId.toUpperCase();
-  var rowIndex = -1;
-
-  for (var r = 1; r < data.length; r++) {
-    var cellId = String(data[r][colMap.id] || "").trim().toUpperCase();
-    if (cellId === targetIdUpper) {
-      rowIndex = r + 1;
-      break;
-    }
-  }
+  var rowIndex = findRowIndexById(data, colMap, targetId);
 
   if (rowIndex === -1) {
     return { status: "error", message: "ID '" + targetId + "' not found in sheet: " + sheet.getName() };
@@ -404,12 +427,12 @@ function handleUpdateLaunch(sheet, payload) {
 }
 
 /**
- * Bulk row update handler for backward compatibility.
+ * Explicit bulk row update handler for batch_update_ready_items.
  */
 function handleBatchUpdate(sheet, payload) {
   var rows = Array.isArray(payload.rows) ? payload.rows : [];
   if (rows.length === 0) {
-    return { status: "success", message: "No rows provided", count: 0 };
+    return { status: "success", message: "No rows provided", count: 0, updated_count: 0 };
   }
 
   var data = sheet.getDataRange().getValues();
@@ -435,6 +458,9 @@ function handleBatchUpdate(sheet, payload) {
     if (item.video_ready !== undefined) sheet.getRange(targetRow, colMap.video_ready + 1).setValue(Boolean(item.video_ready));
     if (item.video_date !== undefined) sheet.getRange(targetRow, colMap.video_date + 1).setNumberFormat("@").setValue(String(item.video_date));
     if (item.short_description !== undefined) sheet.getRange(targetRow, colMap.short_description + 1).setValue(String(item.short_description));
+    if (item.short_title !== undefined && String(item.short_title).trim() !== "") {
+      sheet.getRange(targetRow, colMap.short_title + 1).setValue(String(item.short_title).trim());
+    }
     updatedCount++;
   }
 
@@ -442,7 +468,7 @@ function handleBatchUpdate(sheet, payload) {
 }
 
 /**
- * Resolves column indexes from header row or falls back to column letters A through I.
+ * Resolves column indexes from header row or falls back to column letters A through J.
  */
 function resolveColumnIndexes(headers) {
   var map = {
@@ -454,7 +480,8 @@ function resolveColumnIndexes(headers) {
     script_date: 5,         // Col F (5)
     video_ready: 6,         // Col G (6)
     video_date: 7,          // Col H (7)
-    short_description: 8    // Col I (8)
+    short_description: 8,   // Col I (8)
+    short_title: 9          // Col J (9)
   };
 
   for (var i = 0; i < headers.length; i++) {
@@ -468,21 +495,25 @@ function resolveColumnIndexes(headers) {
     else if (h === "VIDEO_READY" || h === "READY_VIDEO") map.video_ready = i;
     else if (h === "VIDEO_DATE") map.video_date = i;
     else if (h === "SHORT_DESCRIPTION" || h === "DESCRIPTION" || h === "SEO_DESCRIPTION") map.short_description = i;
+    else if (h === "SHORT_TITLE" || h === "TITLE" || h === "VIDEO_TITLE" || h === "SEO_TITLE") map.short_title = i;
   }
 
   return map;
 }
 
 /**
- * Ensures Column I exists and has header "short_description".
+ * Ensures Column I ("short_description") and Column J ("short_title") exist on Row 1.
  */
-function ensureColumnIHeader(sheet) {
-  var lastCol = Math.max(sheet.getLastColumn(), 9);
+function ensureAuditorHeaders(sheet) {
+  var lastCol = Math.max(sheet.getLastColumn(), 10);
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
   var headers = headerRange.getValues()[0];
 
   if (!headers[8] || String(headers[8]).trim() === "") {
     sheet.getRange(1, 9).setValue("short_description");
+  }
+  if (!headers[9] || String(headers[9]).trim() === "") {
+    sheet.getRange(1, 10).setValue("short_title");
   }
 }
 

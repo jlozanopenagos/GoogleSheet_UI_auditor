@@ -20,6 +20,7 @@ class ScriptRecord(BaseModel):
     video_ready: bool = False         # Column G
     video_date: str = ""              # Column H
     short_description: str = ""       # Column I (YouTube Shorts SEO description)
+    short_title: str = ""             # Column J (YouTube Shorts title)
     language: str = ""
     video_type: str = ""
     sheet_url: Optional[str] = None
@@ -35,6 +36,11 @@ class UpdateScriptRequest(BaseModel):
 class UpdateDescriptionRequest(BaseModel):
     script_id: str = Field(..., description="Canonical ID (e.g. EE01)")
     short_description: str = Field(..., description="YouTube Shorts SEO description for Column I")
+
+
+class UpdateTitleRequest(BaseModel):
+    script_id: str = Field(..., description="Canonical ID (e.g. EE01)")
+    short_title: str = Field(..., description="YouTube Shorts title for Column J (non-empty)")
 
 
 class GeminiGenerateRequest(BaseModel):
@@ -67,6 +73,8 @@ class MatrixItem(BaseModel):
     launch_date_iso: str = ""
     has_script_changed: bool = False
     has_short_description: bool = False
+    short_title: str = ""
+    has_short_title: bool = False
     status: str = "grey"  # "violet" | "green" | "yellow" | "grey"
 
 

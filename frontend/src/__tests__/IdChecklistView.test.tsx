@@ -41,6 +41,8 @@ describe('IdChecklistView', () => {
           script_date: '02/11/26',
           has_script_changed: true,
           has_short_description: true,
+          short_title: 'Ready Short Title',
+          has_short_title: true,
         },
         {
           id: 'EE03',
@@ -51,6 +53,8 @@ describe('IdChecklistView', () => {
           script_date: '03/11/26',
           has_script_changed: true,
           has_short_description: false,
+          short_title: '',
+          has_short_title: false,
         },
         {
           id: 'EE04',
@@ -77,15 +81,21 @@ describe('IdChecklistView', () => {
     );
 
     expect(await screen.findByText('EE01')).toBeInTheDocument();
-    expect(screen.getByText('Violet (1)')).toBeInTheDocument();
-    expect(screen.getByText('Green (1)')).toBeInTheDocument();
-    expect(screen.getByText('Yellow (1)')).toBeInTheDocument();
-    expect(screen.getByText('Grey (1)')).toBeInTheDocument();
+    expect(screen.getByText('Launched (1)')).toBeInTheDocument();
+    expect(screen.getByText('Ready (1)')).toBeInTheDocument();
+    expect(screen.getByText('Script only (1)')).toBeInTheDocument();
+    expect(screen.getByText('No script (1)')).toBeInTheDocument();
 
-    // Clicking green tile EE02 shows inspection banner with Schedule in Calendar button
+    // Clicking green tile EE02 shows inspection banner with Schedule in Calendar button & Col J title status
     fireEvent.click(screen.getByText('EE02'));
+    expect(await screen.findByText(/Col J \(Title\): ✓ Filled/)).toBeInTheDocument();
+    expect(screen.getByText(/Title: "Ready Short Title"/)).toBeInTheDocument();
     const scheduleBtn = await screen.findByRole('button', { name: /Schedule in Calendar/i });
     fireEvent.click(scheduleBtn);
     expect(onScheduleInCalendar).toHaveBeenCalledWith('EE02');
+
+    // Clicking yellow tile EE03 shows Col J empty status
+    fireEvent.click(screen.getByText('EE03'));
+    expect(await screen.findByText(/Col J \(Title\): ✗ Empty/)).toBeInTheDocument();
   });
 });

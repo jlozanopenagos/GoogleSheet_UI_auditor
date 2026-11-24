@@ -73,9 +73,10 @@ When the user submits an ID into the search bar:
 | **G** | `video_ready` | Checkbox (`TRUE`/`FALSE`) | - | - | Launch Calendar sync (`TRUE` when launched) |
 | **H** | `video_date` | Date (`DD/MM/YY`) | - | - | Launch Calendar date (`DD/MM/YY`) |
 | **I** | `short_description` | Text | - | Read-only (Left) & Editable (Right) | Green / Calendar Gate |
+| **J** | `short_title` | Text | - | Editable Short Title card (non-empty) | Informational status & search |
 
 > [!IMPORTANT]
-> **Column I Auto-Initialization**: In sheets where Column I is currently unassigned or headerless, the system automatically writes `"short_description"` into row 1 of Column I upon initialization or first save.
+> **Column I & J Auto-Initialization**: In sheets where Column I or Column J is currently unassigned or headerless, the standalone auditor Apps Script automatically writes `"short_description"` into row 1 of Column I and `"short_title"` into row 1 of Column J.
 
 ---
 
@@ -98,8 +99,9 @@ When the user submits an ID into the search bar:
   - **Column E Checkbox (`script_ready`)**: Toggleable only when script content has been edited or populated.
   - **Column F Date Input (`script_date`)**: Formatted as `DD/MM/YY` (e.g. `31/01/26`). Accessible only when script content is edited.
 
-### Tab 2: "Description creation"
+### Tab 2: "Title & description"
 - **Header**: `Editing <ID>: <expression_name>`
+- **Short Title Card (Column J)**: Always visible for the selected ID; displays whether a title is already saved in Column J, supports 1-click copy, live 100-char counter, and manual editing/saving (non-empty text required).
 - **If Column I has content**:
   - Left Box: Read-only Column I content.
   - Right Box: Editable Column I content + Save Button.

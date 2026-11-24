@@ -22,10 +22,15 @@ def test_dopost_dispatches_all_backend_actions():
     for action, handler in [
         ("update_script", "handleUpdateScript"),
         ("update_description", "handleUpdateDescription"),
+        ("update_title", "handleUpdateTitle"),
         ("update_launch", "handleUpdateLaunch"),
+        ("batch_update", "handleBatchUpdate"),
     ]:
         assert f'action === "{action}"' in src
         assert f"function {handler}(" in src
+
+    # Standalone auditor script must reject unknown actions instead of falling back to legacy handlers
+    assert "Unsupported action" in src
 
 
 def test_handle_update_launch_returns_updated_fields_and_fields_supported():
@@ -49,5 +54,31 @@ def test_date_writes_enforce_plain_text_number_format():
 
 def test_doget_returns_all_expected_schema_keys():
     src = _load_code_gs()
-    for key in ("ID:", "expression:", "script:", "SCRIPT_CHANGED:", "script_ready:", "script_date:", "video_ready:", "video_date:", "short_description:"):
+    for key in (
+        "ID:",
+        "expression:",
+        "script:",
+        "SCRIPT_CHANGED:",
+        "script_ready:",
+        "script_date:",
+        "video_ready:",
+        "video_date:",
+        "short_description:",
+        "short_title:",
+    ):
         assert key in src
+
+
+def test_handle_update_title_and_header_init():
+    src = _load_code_gs()
+    match = re.search(r"function handleUpdateTitle\(sheet, payload\)\s*\{(.*?)\n\}", src, re.DOTALL)
+    assert match, "handleUpdateTitle function not found in Code.gs"
+    body = match.group(1)
+
+    assert "colMap.short_title + 1" in body
+    assert "Short title cannot be empty" in body
+    assert 'updated_fields: ["short_title"]' in body
+
+    # Ensure Column I & J header auto-initialization is present
+    assert 'sheet.getRange(1, 9).setValue("short_description")' in src
+    assert 'sheet.getRange(1, 10).setValue("short_title")' in src

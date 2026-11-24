@@ -1,37 +1,38 @@
-# Google Apps Script Setup & Deployment Guide
+# Google Apps Script Setup & Deployment Guide (Standalone Auditor Web App)
 
-This directory contains the enhanced `Code.gs` script for Google Apps Script Web App that powers `GoogleSheet_UI_auditor`.
+This directory contains the standalone `Code.gs` Google Apps Script Web App **exclusively for `GoogleSheet_UI_auditor`**.
+
+> [!IMPORTANT]
+> Deploy this script in **its own standalone Google Apps Script project** (completely separate from `short-automation`). That way, `short-automation` and `GoogleSheet_UI_auditor` never share deployment code, fallback handlers, or conflicting actions.
 
 ---
 
-## What's New in this Version
+## Capabilities in this Version
 
-1. **Column I (`short_description`) Support**:
-   - `doGet` automatically retrieves Column I as `short_description`.
-   - If Column I has no header in your sheet, row 1 is automatically initialized with `"short_description"`.
-2. **In-Place Targeted Row Updates**:
-   - `action: "update_script"`: Locates the exact row matching the script `ID` (e.g. `EE01`) and updates Column D (`SCRIPT_CHANGED`), Column E (`script_ready`), and Column F (`script_date`) in place.
-   - `action: "update_description"`: Locates the exact row matching the script `ID` and updates Column I (`short_description`) in place.
-   - `action: "update_launch"`: Locates the exact row matching the script `ID` and updates Column G (`video_ready`), Column H (`video_date`), and optionally Column E (`script_ready`) for YouTube launch calendar tracking.
+1. **Columns A through J Support**:
+   - `doGet` reads Columns A–J (`ID`, `expression`, `script`, `SCRIPT_CHANGED`, `script_ready`, `script_date`, `video_ready`, `video_date`, `short_description`, `short_title`).
+   - `ensureAuditorHeaders` automatically initializes Row 1 headers for Column I (`"short_description"`) and Column J (`"short_title"`) if blank.
+2. **Explicit In-Place Actions (`doPost`)**:
+   - `action: "update_script"`: Updates Column D (`SCRIPT_CHANGED`), Column E (`script_ready`), and Column F (`script_date`) in place.
+   - `action: "update_description"`: Updates Column I (`short_description`) in place.
+   - `action: "update_title"`: Updates Column J (`short_title`) in place (requires non-empty text).
+   - `action: "update_launch"`: Updates Column G (`video_ready`), Column H (`video_date`), and optionally Column E/F for Launch Calendar tracking.
+   - `action: "batch_update"`: Bulk updates rows by ID.
+   - Unknown or missing `action` values return an explicit `Unsupported action` error (zero legacy fallback behavior).
 3. **Strict Date Formatting**:
-   - Cell dates in Columns F and H are normalized to `DD/MM/YY` (e.g. `31/01/26`).
+   - Cell dates in Columns F and H are written with `.setNumberFormat("@")` and normalized to `DD/MM/YY` (e.g. `31/01/26`).
 
 ---
 
-The Apps Script endpoint serves the editorial auditor. Keep its deployment URL in the auditor's local configuration. Run the auditor's mocked tests before deploying any sheet schema changes.
+## Standalone Deployment Steps (2 Minutes)
 
-## Deployment Steps (2 Minutes)
-
-1. Open your master Google Sheet (the one where your scripts live).
-2. Click **Extensions > Apps Script** in the top menu.
-3. Delete any existing code in `Code.gs` and paste the entire contents of [`Code.gs`](./Code.gs).
-4. Click the **Save** icon (💾 or `Ctrl + S`).
-5. Click **Deploy > Manage deployments** (top right).
-6. Click the **pencil icon (Edit)** next to your active deployment.
-7. Under **Version**, click the dropdown and choose **New version**.
-8. Ensure:
+1. Go to [script.google.com](https://script.google.com/) (signed in with the Google account that has edit access to all 16 spreadsheets).
+2. Click **New project** and name it `GoogleSheet_UI_auditor_WebApp` (do **not** reuse your `short-automation` project).
+3. Delete the placeholder `myFunction()` code in `Code.gs` and paste the entire contents of [`Code.gs`](./Code.gs).
+4. Click **Save** (`Ctrl + S`).
+5. Click **Deploy > New deployment** (or **Deploy > Manage deployments > Edit > New version** when updating an existing standalone auditor deployment).
+6. Select type **Web app** and set:
    - **Execute as**: `Me`
    - **Who has access**: `Anyone`
-9. Click **Deploy**.
-10. If the Web App URL changed, update `SHEETS_MASTER_WEBAPP_URL` in `.env`. If you used "Manage deployments > New version", the URL stays exactly the same!
-
+7. Click **Deploy**, authorize permissions if prompted, and copy the **Web app URL** (`https://script.google.com/macros/s/.../exec`).
+8. Set `SHEETS_MASTER_WEBAPP_URL` in `.env` to that dedicated Web App URL.

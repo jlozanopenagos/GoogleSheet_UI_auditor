@@ -30,11 +30,13 @@ export const App: React.FC = () => {
         type: 'success',
         message: `Successfully loaded ${record.ID} (${lang} · ${vtype}) from Google Sheets.`,
       });
+      return true;
     } catch (err: any) {
       setNotification({
         type: 'error',
         message: err.message || `Could not find script ID '${id}'.`,
       });
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +83,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Workspace */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 flex flex-col gap-4">
         {/* Universal ID Search Bar: shown on Script Auditor & Description Creator tabs */}
         {activeTab !== 'id_checklist' && activeTab !== 'launch_calendar' && (
           <IdSearchBar

@@ -16,6 +16,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
   onError,
   onSuccess,
 }) => {
+  const [showReference, setShowReference] = useState(false);
   const [copied, setCopied] = useState(false);
   const [initialScriptChanged, setInitialScriptChanged] = useState('');
   const [scriptChanged, setScriptChanged] = useState('');
@@ -160,14 +161,17 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
       </div>
 
       {/* Side-by-Side Dual Script Comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4">
         {/* Left Column: Column C (Original Script - Read Only) */}
-        <div className="flex flex-col bg-brand-surface border border-brand-border rounded-2xl p-5 shadow-xl">
+        <button type="button" className="lg:hidden order-2 w-fit px-3 py-2 text-sm font-semibold text-brand-sky" aria-expanded={showReference} aria-controls="editor-reference" onClick={() => setShowReference(!showReference)}>
+              {showReference ? 'Hide original script' : 'Show original script'}
+            </button>
+            <div id="editor-reference" className={`${showReference ? 'flex' : 'hidden'} lg:flex order-3 lg:order-none min-w-0 flex-col border border-brand-border rounded-xl p-4`}>
           <div className="flex items-center justify-between pb-3 border-b border-brand-border mb-3">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-brand-amethyst"></span>
               <h3 className="font-bold text-sm text-brand-ice">
-                Original script · Column C <span className="text-xs text-brand-ice/50 font-normal">(read-only)</span>
+                Original script <span className="text-xs text-brand-ice/75 font-normal">(read-only)</span>
               </h3>
             </div>
             <button
@@ -190,28 +194,28 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
             </button>
           </div>
 
-          <div className="relative flex-1 min-h-[320px]">
+          <div className="relative flex-1 min-h-[220px]">
             <textarea
               readOnly
               value={script.script || ''}
               placeholder="(Original script in Column C is empty)"
-              className="w-full h-full min-h-[320px] p-4 bg-brand-input border border-brand-border rounded-xl text-brand-ice/90 text-sm leading-relaxed resize-none focus:outline-none mono-font selection:bg-brand-amethyst/40 cursor-text"
+              className="w-full h-full min-h-[220px] p-4 bg-brand-input border border-brand-border rounded-xl text-brand-ice/90 text-sm leading-relaxed resize-y focus:outline-none selection:bg-brand-amethyst/40 cursor-text"
             />
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-xs text-brand-ice/50">
+          <div className="mt-3 flex items-center justify-between text-xs text-brand-ice/75">
             <span>Word count: {script.script ? script.script.trim().split(/\s+/).length : 0} words</span>
             <span>Character count: {script.script.length}</span>
           </div>
         </div>
 
         {/* Right Column: Column D (SCRIPT_CHANGED - Editable) */}
-        <div className="flex flex-col bg-brand-surface border border-brand-border rounded-2xl p-5 shadow-xl">
+        <div className="flex min-w-0 flex-col bg-brand-surface border border-brand-border rounded-xl p-4">
           <div className="flex items-center justify-between pb-3 border-b border-brand-border mb-3">
             <div className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${hasScriptChanged ? 'bg-brand-sky animate-pulse' : 'bg-brand-amethyst'}`}></span>
               <h3 className="font-bold text-sm text-white">
-                Script revision · Column D <span className="text-xs text-brand-sky font-normal">(editable)</span>
+                Script revision <span className="text-xs text-brand-sky font-normal">(editable)</span>
               </h3>
             </div>
             {hasScriptChanged && (
@@ -221,13 +225,14 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
             )}
           </div>
 
-          <div className="relative flex-1 min-h-[320px]">
+          <div className="relative flex-1 min-h-[220px]">
             <textarea
+              aria-label="Script revision"
               value={scriptChanged}
               onChange={(e) => setScriptChanged(e.target.value)}
               disabled={isUpdating || isDoctoring}
               placeholder={placeholderText}
-              className="w-full h-full min-h-[320px] p-4 pr-12 bg-brand-input border border-brand-border focus:border-brand-sky rounded-xl text-white text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-brand-sky/40 mono-font transition-all"
+              className="w-full h-full min-h-[220px] p-4 pr-12 bg-brand-input border border-brand-border focus:border-brand-sky rounded-xl text-white text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-brand-sky/40 transition-all"
             />
             {/* Gemini Script Doctor button in the top right corner */}
             <button
@@ -244,7 +249,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
             </button>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-xs text-brand-ice/50">
+          <div className="mt-3 flex items-center justify-between text-xs text-brand-ice/75">
             <span>Word count: {scriptChanged ? scriptChanged.trim().split(/\s+/).length : 0} words</span>
             <span>Character count: {scriptChanged.length}</span>
           </div>
@@ -269,7 +274,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
                 />
                 <div className="flex flex-col">
                   <span className="text-xs font-bold text-brand-ice">
-                    Ready for production · Column E
+                    Ready for production
                   </span>
                   <span className="text-[11px] text-brand-ice/60">
                     Mark script finalized for production
@@ -288,12 +293,13 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-brand-ice flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-brand-sky" />
-                    Scheduled date · Column F
+                    Scheduled date
                   </span>
-                  <span className="text-[10px] text-brand-ice/50 mono-font">DD/MM/YY</span>
+                  <span className="text-[10px] text-brand-ice/75 mono-font">DD/MM/YY</span>
                 </div>
                 <input
                   type="text"
+                  aria-label="Scheduled date (DD/MM/YY)"
                   value={scriptDate}
                   onChange={(e) => setScriptDate(e.target.value)}
                   placeholder="31/01/26"
@@ -304,14 +310,15 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
               </div>
             </div>
 
-            {/* Submit Update Button */}
+            <div className="editor-actions sticky bottom-0 z-20 bg-brand-surface py-2">
+            <p role="status" className="mb-1 text-xs text-brand-ice/80">{hasScriptChanged ? 'Unsaved changes' : 'No unsaved changes'}</p>
             <button
               onClick={handleSave}
               disabled={!isSaveEnabled}
               className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all duration-200 ${
                 isSaveEnabled
                   ? 'bg-gradient-to-r from-brand-sky via-brand-amethyst to-brand-mulberry hover:opacity-95 text-white cursor-pointer shadow-brand-mulberry/30'
-                  : 'bg-brand-card/60 text-brand-ice/30 cursor-not-allowed border border-brand-border'
+                  : 'bg-brand-card/60 text-brand-ice/65 cursor-not-allowed border border-brand-border'
               }`}
             >
               {isUpdating ? (
@@ -335,6 +342,7 @@ export const ScriptAuditorView: React.FC<ScriptAuditorViewProps> = ({
                 </>
               )}
             </button>
+            </div>
           </div>
         </div>
       </div>

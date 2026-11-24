@@ -9,10 +9,8 @@ import {
   Sparkles,
   FileEdit,
   Loader2,
-  RefreshCw,
   Trash2,
   Rocket,
-  Layers,
   ShieldCheck,
   X,
 } from 'lucide-react';
@@ -43,7 +41,6 @@ const LANG_META: Record<
     rowClass: string;
     codeClass: string;
     dotClass: string;
-    filterActiveClass: string;
   }
 > = {
   english: {
@@ -53,7 +50,6 @@ const LANG_META: Record<
     rowClass: 'bg-blue-500/10 border-l-[3px] border-l-blue-400 border-y border-r border-blue-500/20',
     codeClass: 'text-blue-300',
     dotClass: 'bg-blue-400',
-    filterActiveClass: 'bg-blue-600/80 text-white border border-blue-400/60 shadow-sm',
   },
   french: {
     code: 'FR',
@@ -62,7 +58,6 @@ const LANG_META: Record<
     rowClass: 'bg-violet-500/10 border-l-[3px] border-l-violet-400 border-y border-r border-violet-500/20',
     codeClass: 'text-violet-300',
     dotClass: 'bg-violet-400',
-    filterActiveClass: 'bg-violet-600/80 text-white border border-violet-400/60 shadow-sm',
   },
   spanish: {
     code: 'ES',
@@ -71,7 +66,6 @@ const LANG_META: Record<
     rowClass: 'bg-amber-500/10 border-l-[3px] border-l-amber-400 border-y border-r border-amber-500/20',
     codeClass: 'text-amber-300',
     dotClass: 'bg-amber-400',
-    filterActiveClass: 'bg-amber-600/80 text-white border border-amber-400/60 shadow-sm',
   },
   italian: {
     code: 'IT',
@@ -80,7 +74,6 @@ const LANG_META: Record<
     rowClass: 'bg-emerald-500/10 border-l-[3px] border-l-emerald-400 border-y border-r border-emerald-500/20',
     codeClass: 'text-emerald-300',
     dotClass: 'bg-emerald-400',
-    filterActiveClass: 'bg-emerald-600/80 text-white border border-emerald-400/60 shadow-sm',
   },
 };
 
@@ -159,7 +152,6 @@ function groupDayEntriesByLanguage(dayItems: CalendarEntry[]) {
         rowClass: 'bg-slate-500/10 border-l-[3px] border-l-slate-400 border-y border-r border-slate-500/20',
         codeClass: 'text-slate-300',
         dotClass: 'bg-slate-400',
-        filterActiveClass: 'bg-slate-600 text-white',
       },
       items: sortedItems,
     };
@@ -219,6 +211,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
 
   // Form / Scheduler state
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
   const scriptIdInputRef = useRef<HTMLInputElement>(null);
   const [scriptIdInput, setScriptIdInput] = useState<string>('');
   const [selectedIsoDate, setSelectedIsoDate] = useState<string>(() => toIsoDate(new Date()));
@@ -238,7 +231,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
     triad_complete_days: 0,
     triad_partial_days: 0,
   });
-  const [isLoadingEntries, setIsLoadingEntries] = useState<boolean>(false);
+  const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSyncingSheets, setIsSyncingSheets] = useState<boolean>(false);
 
   const activeMonthKey = useMemo(() => toMonthKey(viewDate), [viewDate]);
@@ -285,6 +278,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
   useEffect(() => {
     if (initialScriptId && initialScriptId.trim()) {
       const clean = initialScriptId.trim().toUpperCase();
+      setSchedulerOpen(true);
       setScriptIdInput(clean);
       setPreflight(null);
       runCheck(clean, selectedIsoDate);
@@ -357,7 +351,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
   const handleUnschedule = async (entry: CalendarEntry) => {
     try {
       await unscheduleCalendarId(entry.id);
-      onSuccess(`Removed ${entry.id} from ${entry.sheet_date}. Its Bingo card is back to Green.`);
+      onSuccess(`Removed ${entry.id} from ${entry.sheet_date}. Its checklist status is Ready.`);
       await loadCalendar();
       onCalendarChanged?.();
     } catch (err: any) {
@@ -469,11 +463,103 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
   };
 
   const todayIso = toIsoDate(today);
+  const visibleShortCount = calendarDays.reduce((count, { iso, inCurrentMonth }) => (
+    count + (inCurrentMonth ? entriesByDate[iso]?.length ?? 0 : 0)
+  ), 0);
 
   return (
-    <div className="flex flex-col gap-6 animate-fadeIn">
-      {/* Scheduler & Readiness Verification Panel */}
-      <div className="bg-brand-surface/90 border border-brand-border rounded-2xl p-5 shadow-xl backdrop-blur-sm flex flex-col gap-4">
+    <div className="flex flex-col gap-4 animate-fadeIn">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl" aria-live="polite">{monthTitle}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
+            <button
+              type="button"
+              aria-pressed={viewMode === 'month'}
+              onClick={() => setViewMode('month')}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                viewMode === 'month' ? 'bg-brand-card text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Month
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'week'}
+              onClick={() => setViewMode('week')}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                viewMode === 'week' ? 'bg-brand-card text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Week
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
+            <button
+              type="button"
+              onClick={navigatePrev}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-brand-surface cursor-pointer"
+              title="Previous"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={navigateToday}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold text-violet-300 hover:bg-brand-surface cursor-pointer"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={navigateNext}
+              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-brand-surface cursor-pointer"
+              title="Next"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+            <button type="button" aria-expanded={schedulerOpen} aria-controls="launch-scheduler" onClick={() => setSchedulerOpen(!schedulerOpen)} className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-500">
+          {schedulerOpen ? 'Close scheduling form' : 'Schedule a Short'}
+        </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-t border-brand-border pt-3">
+          <div role="group" aria-label="Filter by language" className="flex flex-wrap items-center gap-1">
+            {LANGUAGES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={selectedLanguage === id}
+                onClick={() => setSelectedLanguage(id)}
+                className="inline-flex min-h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-brand-ice/80 hover:bg-brand-card hover:text-white aria-pressed:bg-brand-card aria-pressed:font-semibold aria-pressed:text-white"
+              >
+                {LANG_META[id] && <span aria-hidden="true" className={`h-2 w-2 rounded-full ${LANG_META[id].dotClass}`} />}
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <p role="status" className="text-brand-ice/80">
+              {isLoadingEntries ? 'Loading calendar…' : `${visibleShortCount} ${visibleShortCount === 1 ? 'Short' : 'Shorts'} this ${viewMode}`}
+            </p>
+            <details className="relative">
+              <summary className="cursor-pointer rounded px-2 py-1.5 text-brand-ice hover:bg-brand-card">
+                {isSyncingSheets ? 'Syncing…' : 'Sheet actions'}
+              </summary>
+              <div className="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-brand-border bg-brand-surface p-1 shadow-lg">
+                <button type="button" onClick={handleSyncFromSheets} disabled={isSyncingSheets || isLoadingEntries} className="block w-full rounded px-3 py-2 text-left hover:bg-brand-card disabled:opacity-50">Sync from Sheets</button>
+                <button type="button" onClick={loadCalendar} disabled={isLoadingEntries} className="block w-full rounded px-3 py-2 text-left hover:bg-brand-card disabled:opacity-50">Refresh</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </div>
+
+      <div id="launch-scheduler" hidden={!schedulerOpen}>
+      <div className="bg-brand-surface/90 border border-brand-border rounded-xl p-4 flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-border/60 pb-3.5">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-violet-600/30 border border-violet-400/50 flex items-center justify-center text-violet-200 shadow-sm">
@@ -481,17 +567,16 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-tight">
-                YouTube Launch Calendar & Readiness Gate
+                Schedule a Short
               </h2>
               <p className="text-xs text-brand-ice/60">
-                Log launched IDs after verifying <span className="text-emerald-300 font-semibold">Col D + Col E (script checked)</span> and{' '}
-                <span className="text-emerald-300 font-semibold">Col I (SEO description)</span> · Cadence: 1 Fun Fact OR max 3 (E + G + R) per day per language
+                A Short needs a script revision, production approval, and a description. Per language, each day allows one Fun Fact or up to three Expression, Game, and Roleplay Shorts.
               </p>
             </div>
           </div>
 
           <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-violet-500/20 text-violet-200 border border-violet-400/40">
-            Scheduled IDs turn Violet in Bingo
+            Scheduled IDs appear as Launched in the ID checklist
           </span>
         </div>
 
@@ -504,10 +589,11 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
           className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end"
         >
           <div className="md:col-span-4 flex flex-col gap-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-brand-ice/60">
+            <label htmlFor="launch-script-id" className="text-[11px] font-bold uppercase tracking-wider text-brand-ice/60">
               Script ID to Launch
             </label>
             <input
+              id="launch-script-id"
               ref={scriptIdInputRef}
               type="text"
               value={scriptIdInput}
@@ -518,11 +604,12 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
           </div>
 
           <div className="md:col-span-3 flex flex-col gap-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-brand-ice/60 flex items-center justify-between">
+            <label htmlFor="launch-date" className="text-[11px] font-bold uppercase tracking-wider text-brand-ice/60 flex items-center justify-between">
               <span>Launch Date</span>
               <span className="mono-font text-violet-300">{formatShortDateLabel(selectedIsoDate)}</span>
             </label>
             <input
+              id="launch-date"
               type="date"
               value={selectedIsoDate}
               onChange={(e) => {
@@ -556,6 +643,8 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
             </button>
           </div>
         </form>
+
+        {!scriptIdInput.trim() && <p className="text-sm text-brand-ice/80">Enter a script ID to check readiness and schedule it.</p>}
 
         {/* Live Readiness & Daily Cadence Diagnostic Panel */}
         {preflight && (
@@ -744,375 +833,119 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
           </div>
         )}
       </div>
-
-      {/* Filters, Month/Week Navigation & KPI Summary */}
-      <div className="bg-brand-surface/80 border border-brand-border rounded-2xl p-5 shadow-lg flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Language Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-brand-ice/60 mr-1 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-violet-400" />
-              Language:
-            </span>
-            <div className="flex flex-wrap items-center gap-1.5 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
-              {LANGUAGES.map((lang) => {
-                const lmeta = lang.id !== 'all' ? LANG_META[lang.id] : null;
-                const activeClass = lmeta
-                  ? lmeta.filterActiveClass
-                  : 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-sm';
-                return (
-                  <button
-                    key={lang.id}
-                    type="button"
-                    onClick={() => setSelectedLanguage(lang.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      selectedLanguage === lang.id
-                        ? activeClass
-                        : 'text-slate-300 hover:text-white hover:bg-brand-surface'
-                    }`}
-                  >
-                    {lmeta && <span className={`w-2 h-2 rounded-full ${lmeta.dotClass}`} />}
-                    <span>{lang.flag}</span>
-                    <span>{lang.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Month / Week Controls */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
-              <button
-                type="button"
-                onClick={() => setViewMode('month')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
-                  viewMode === 'month' ? 'bg-brand-card text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Month
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('week')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
-                  viewMode === 'week' ? 'bg-brand-card text-white' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Week
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1 bg-brand-dark/80 p-1 rounded-xl border border-brand-border">
-              <button
-                type="button"
-                onClick={navigatePrev}
-                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-brand-surface cursor-pointer"
-                title="Previous"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={navigateToday}
-                className="px-2.5 py-1 rounded-lg text-xs font-bold text-violet-300 hover:bg-brand-surface cursor-pointer"
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                onClick={navigateNext}
-                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-brand-surface cursor-pointer"
-                title="Next"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            <span className="text-sm font-extrabold text-white px-2">{monthTitle}</span>
-
-            <button
-              type="button"
-              onClick={handleSyncFromSheets}
-              disabled={isSyncingSheets || isLoadingEntries}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/30 hover:bg-violet-600/50 border border-violet-400/50 text-xs font-semibold text-violet-100 rounded-xl cursor-pointer disabled:opacity-50"
-              title="Pull scheduled IDs from all 16 Google Sheet tabs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheets ? 'animate-spin text-violet-300' : ''}`} />
-              <span>{isSyncingSheets ? 'Syncing...' : 'Sync from Sheets'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={loadCalendar}
-              disabled={isLoadingEntries}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-card hover:bg-brand-surface border border-brand-border text-xs font-semibold text-brand-ice rounded-xl cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingEntries ? 'animate-spin text-violet-400' : ''}`} />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Summary Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-brand-border/50">
-          <div className="bg-brand-dark/60 border border-violet-500/30 rounded-xl p-3">
-            <div className="text-[11px] uppercase tracking-wider text-violet-300 font-bold">
-              Launched ({viewMode === 'month' ? 'Month' : 'Total'})
-            </div>
-            <div className="text-2xl font-extrabold text-white mono-font mt-0.5">{summary.total}</div>
-            <div className="text-[10px] text-brand-ice/50">Violet in Bingo Checklist</div>
-          </div>
-
-          <div className="bg-brand-dark/60 border border-brand-border rounded-xl p-3">
-            <div className="text-[11px] uppercase tracking-wider text-fuchsia-300 font-bold">
-              Fun Fact Days
-            </div>
-            <div className="text-2xl font-extrabold text-fuchsia-200 mono-font mt-0.5">
-              {summary.fun_fact_days}
-            </div>
-            <div className="text-[10px] text-brand-ice/50">1 Fun Fact / day / lang</div>
-          </div>
-
-          <div className="bg-brand-dark/60 border border-brand-border rounded-xl p-3">
-            <div className="text-[11px] uppercase tracking-wider text-emerald-300 font-bold">
-              Full 3-Short Triads
-            </div>
-            <div className="text-2xl font-extrabold text-emerald-200 mono-font mt-0.5">
-              {summary.triad_complete_days}
-            </div>
-            <div className="text-[10px] text-brand-ice/50">1 Expr + 1 Game + 1 Role</div>
-          </div>
-
-          <div className="bg-brand-dark/60 border border-brand-border rounded-xl p-3">
-            <div className="text-[11px] uppercase tracking-wider text-sky-300 font-bold">
-              Partial Triad Days
-            </div>
-            <div className="text-2xl font-extrabold text-sky-200 mono-font mt-0.5">
-              {summary.triad_partial_days}
-            </div>
-            <div className="text-[10px] text-brand-ice/50">Remaining E/G/R slots open</div>
-          </div>
-        </div>
       </div>
 
-      {/* Dynamic Monthly / Weekly Calendar Grid */}
-      <div className="bg-brand-surface/60 border border-brand-border rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col gap-3">
-        {/* Orthogonal Language & Format Color Legend Bar */}
-        <div
-          aria-label="Calendar Color Legend"
-          className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 rounded-xl bg-brand-dark/70 border border-brand-border/60 text-[11px]"
-        >
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-bold uppercase tracking-wider text-brand-ice/50 text-[10px]">Languages:</span>
-            {LANGUAGE_ORDER.map((lang) => {
-              const lmeta = LANG_META[lang];
-              return (
-                <span key={lang} className="inline-flex items-center gap-1.5 font-semibold text-slate-200">
-                  <span className={`w-2 h-2 rounded-full ${lmeta.dotClass}`} />
-                  <span className={`mono-font font-bold ${lmeta.codeClass}`}>{lmeta.code}</span>
-                  <span className="text-brand-ice/60 hidden sm:inline">{lmeta.label}</span>
-                </span>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="font-bold uppercase tracking-wider text-brand-ice/50 text-[10px]">Types:</span>
-            {(['expression', 'game', 'roleplay', 'fun_facts'] as const).map((vt) => {
-              const tmeta = TYPE_META[vt];
-              return (
-                <span key={vt} className="inline-flex items-center gap-1 text-slate-200 font-semibold">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border mono-font ${tmeta.badgeClass}`}>
-                    {tmeta.code}
-                  </span>
-                  <span className="text-brand-ice/70">{tmeta.label}</span>
-                </span>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Weekday Column Headers */}
-        <div className="grid grid-cols-7 gap-2">
+      <section aria-label={viewMode === 'month' ? 'Month calendar' : 'Week calendar'} className="rounded-xl border border-brand-border bg-brand-surface">
+        <div aria-hidden="true" className={`grid-cols-7 border-b border-brand-border ${viewMode === 'week' ? 'hidden lg:grid' : 'grid'}`}>
           {WEEKDAYS.map((day) => (
-            <div
-              key={day}
-              className="text-center text-[11px] font-bold uppercase tracking-wider text-brand-ice/50 py-1"
-            >
-              {day}
-            </div>
+            <div key={day} className="py-2 text-center text-xs font-semibold text-brand-ice/80">{day}</div>
           ))}
         </div>
-
-        {/* Day Cells */}
-        <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
+        <div className={`grid gap-px bg-brand-border ${viewMode === 'month' ? 'grid-cols-7' : 'grid-cols-1 lg:grid-cols-7'}`}>
           {calendarDays.map(({ date, iso, inCurrentMonth }) => {
             const dayItems = entriesByDate[iso] || [];
             const isToday = iso === todayIso;
-            const isSelectedDay = iso === selectedIsoDate;
-            const langGroups = groupDayEntriesByLanguage(dayItems);
-            const isCompactMonth = viewMode === 'month';
+            const monthMode = viewMode === 'month';
+            const dateLabel = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
             return (
               <div
                 key={iso}
-                data-testid={`calendar-day-${iso}`}
-                onClick={() => {
-                  setSelectedIsoDate(iso);
-                  setInspectedIsoDate(iso);
-                }}
-                className={`group/day ${isCompactMonth ? 'h-[144px] overflow-hidden' : 'min-h-[160px]'} rounded-xl p-2 border transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  !inCurrentMonth
-                    ? 'bg-brand-dark/30 border-brand-border/30 opacity-45'
-                    : isSelectedDay
-                    ? 'bg-brand-card border-brand-sky/80 ring-1 ring-brand-sky/40 shadow-lg shadow-sky-500/10'
-                    : 'bg-brand-card/75 border-brand-border hover:border-brand-sky/50'
-                }`}
+                className={`group/day min-w-0 bg-brand-surface ${monthMode ? 'min-h-[76px] sm:min-h-[92px]' : 'lg:min-h-[140px]'} ${!inCurrentMonth ? 'bg-brand-dark' : ''}`}
               >
-                {/* Compact Day Header: Day # + Total Count + Quick Schedule Focus */}
-                <div className="flex items-center justify-between gap-1 shrink-0">
-                  <span
-                    className={`text-xs font-bold mono-font px-1.5 py-0.5 rounded-md leading-none ${
-                      isToday
-                        ? 'bg-violet-600 text-white shadow-sm'
-                        : isSelectedDay
-                        ? 'text-brand-sky'
-                        : 'text-slate-300'
-                    }`}
+                <div className="relative">
+                  <button
+                    type="button"
+                    data-testid={`calendar-day-${iso}`}
+                    aria-label={`${dateLabel}, ${dayItems.length} ${dayItems.length === 1 ? 'Short' : 'Shorts'}. View day details`}
+                    aria-current={isToday ? 'date' : undefined}
+                    onClick={() => {
+                      setSelectedIsoDate(iso);
+                      setInspectedIsoDate(iso);
+                    }}
+                    className={`flex w-full flex-col items-stretch justify-start text-left hover:bg-brand-card ${monthMode ? 'min-h-[76px] px-1.5 pb-2 pt-1.5 sm:min-h-[92px] sm:px-3' : 'px-3 py-2'} ${inCurrentMonth ? 'text-brand-ice' : 'text-brand-ice/60'}`}
                   >
-                    {date.getDate()}
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    {dayItems.length > 0 && (
-                      <span
-                        title={`${dayItems.length} scheduled short(s) — click day to inspect`}
-                        className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold mono-font bg-brand-dark/80 text-brand-ice/80 border border-brand-border/70 leading-none"
-                      >
-                        {dayItems.length}
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pr-1 sm:pr-6">
+                      <span className={`inline-grid h-6 min-w-6 place-items-center rounded-md px-1 text-sm font-semibold tabular-nums ${isToday ? 'bg-violet-600 text-white' : ''}`}>
+                        {date.getDate()}
+                      </span>
+                      {!monthMode && <span className="text-sm font-semibold lg:hidden">{dateLabel}</span>}
+                      {dayItems.length > 0 && <span className="text-[11px] font-semibold tabular-nums text-brand-ice/80">{dayItems.length}<span className="hidden xl:inline"> {dayItems.length === 1 ? 'Short' : 'Shorts'}</span></span>}
+                    </span>
+                    {monthMode && (
+                      <span className="mt-1 grid grid-cols-2 gap-x-2 gap-y-1 px-1">
+                        {groupDayEntriesByLanguage(dayItems).map(({ lang, meta, items }) => (
+                          <span key={lang} data-testid={`day-${iso}-lang-${meta.code}`} className={`flex items-center gap-1 text-[11px] font-semibold ${meta.codeClass}`}>
+                            <span className="hidden sm:inline">{meta.code}</span>
+                            <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full sm:hidden ${meta.dotClass}`} />
+                            <span className="tabular-nums">{items.length}</span>
+                          </span>
+                        ))}
                       </span>
                     )}
-                    <button
-                      type="button"
-                      title={`Select ${formatShortDateLabel(iso)} to schedule`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedIsoDate(iso);
-                        scriptIdInputRef.current?.focus();
-                      }}
-                      className="p-0.5 rounded-md text-brand-ice/35 opacity-70 group-hover/day:opacity-100 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Schedule a Short on ${dateLabel}`}
+                    title={`Select ${formatShortDateLabel(iso)} to schedule`}
+                    onClick={() => {
+                      setSelectedIsoDate(iso);
+                      setSchedulerOpen(true);
+                      requestAnimationFrame(() => scriptIdInputRef.current?.focus());
+                    }}
+                    className={`${monthMode ? 'hidden sm:inline-flex' : 'inline-flex'} absolute right-1 top-1.5 h-7 w-7 items-center justify-center rounded text-brand-ice/80 hover:bg-brand-card hover:text-white lg:opacity-0 lg:group-hover/day:opacity-100 lg:group-focus-within/day:opacity-100`}
+                  ><Plus className="h-4 w-4" /></button>
                 </div>
 
-                {/* Day Body: Ultra-compact single-line micro-rows in Month, full chips in Week */}
-                {isCompactMonth ? (
-                  <div className="flex-1 flex flex-col gap-1 overflow-hidden">
-                    {langGroups.map(({ lang, meta: lmeta, items }) => (
-                      <div
-                        key={lang}
-                        data-testid={`day-${iso}-lang-${lmeta.code}`}
-                        title={`${lmeta.label}: ${items
-                          .map((it) => `${it.id} (${TYPE_META[it.video_type]?.label || it.video_type})`)
-                          .join(', ')}`}
-                        className={`rounded-md px-1.5 py-0.5 flex items-center justify-between gap-1 shrink-0 ${lmeta.rowClass}`}
-                      >
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-extrabold mono-font leading-none shrink-0 ${lmeta.codeClass}`}
-                        >
-                          <span className="text-[9px]">{lmeta.flag}</span>
-                          <span>{lmeta.code}</span>
-                        </span>
-
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          {items.map((item) => {
-                            const tmeta = TYPE_META[item.video_type] || {
-                              code: '?',
-                              label: item.video_type,
-                              badgeClass: 'bg-slate-600/30 text-slate-200 border-slate-400/40',
-                              dotClass: 'bg-slate-400',
-                            };
-                            return (
-                              <span
-                                key={item.id}
-                                title={`${item.id}: ${item.expression || 'No title'}`}
-                                className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-extrabold border mono-font leading-none ${tmeta.badgeClass}`}
-                              >
-                                {tmeta.code}
-                              </span>
-                            );
-                          })}
-                        </div>
+                {!monthMode && (
+                  <div className="grid gap-3 px-3 pb-3 sm:grid-cols-2 lg:grid-cols-1">
+                    {groupDayEntriesByLanguage(dayItems).map(({ lang, meta, items }) => (
+                      <div key={lang} data-testid={`day-${iso}-lang-${meta.code}`} className="min-w-0 border-t border-brand-border pt-2">
+                        <h3 className="flex items-center gap-1.5 text-xs font-semibold text-brand-ice/90">
+                          <span aria-hidden="true" className={`h-2 w-2 rounded-full ${meta.dotClass}`} />{meta.label}
+                        </h3>
+                        <ul className="mt-1 space-y-0.5">
+                          {items.map((item) => (
+                            <li key={item.id} className="flex min-w-0 items-center gap-0.5">
+                              <button type="button" onClick={() => onOpenIdInTab(item.id, 'script_auditor')} aria-label={`${item.id} · ${TYPE_META[item.video_type]?.label || item.video_type}`} title={item.expression || item.id} className="min-w-0 flex-1 rounded px-1 py-1 text-left text-xs hover:bg-brand-card">
+                                <span className="font-semibold text-white">{item.id}</span>
+                                <span className="text-brand-ice/75"> · {TYPE_META[item.video_type]?.label || item.video_type}</span>
+                              </button>
+                              <button type="button" aria-label={`Unschedule ${item.id}`} onClick={() => handleUnschedule(item)} className="rounded p-1.5 text-brand-ice/75 hover:text-rose-300 lg:opacity-0 lg:group-hover/day:opacity-100 lg:group-focus-within/day:opacity-100">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col gap-1">
-                    {langGroups.map(({ lang, meta: lmeta, items }) => (
-                      <div
-                        key={lang}
-                        data-testid={`day-${iso}-lang-${lmeta.code}`}
-                        className={`rounded-lg px-1.5 py-1 flex flex-col gap-1 ${lmeta.rowClass}`}
-                      >
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-extrabold mono-font leading-none ${lmeta.codeClass}`}
-                        >
-                          <span>{lmeta.flag}</span>
-                          <span>{lmeta.code}</span>
-                        </span>
-
-                        <div className="flex flex-wrap items-center gap-1">
-                          {items.map((item) => {
-                            const tmeta = TYPE_META[item.video_type] || {
-                              code: '?',
-                              label: item.video_type,
-                              badgeClass: 'bg-slate-600/30 text-slate-200 border-slate-400/40',
-                              dotClass: 'bg-slate-400',
-                            };
-                            return (
-                              <div
-                                key={item.id}
-                                title={`${item.id}: ${item.expression || 'No title'}\n${lmeta.label} · ${tmeta.label}\nClick chip to open in Script Auditor`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenIdInTab(item.id, 'script_auditor');
-                                }}
-                                className="group/chip inline-flex items-center gap-1 px-1 py-0.5 rounded-md bg-brand-dark/85 border border-white/10 hover:border-white/30 text-[10px] font-bold text-slate-100 transition-colors cursor-pointer"
-                              >
-                                <span
-                                  className={`px-1 rounded text-[9px] font-extrabold border leading-tight ${tmeta.badgeClass}`}
-                                >
-                                  {tmeta.code}
-                                </span>
-                                <span className="mono-font tracking-tight">{item.id}</span>
-                                <button
-                                  type="button"
-                                  aria-label={`Unschedule ${item.id}`}
-                                  title={`Unschedule ${item.id} (reverts Bingo card to Green)`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUnschedule(item);
-                                  }}
-                                  className="opacity-0 group-hover/chip:opacity-100 focus:opacity-100 hover:text-rose-300 text-slate-400 transition-opacity cursor-pointer"
-                                >
-                                  <X className="w-2.5 h-2.5" />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
+                    {dayItems.length === 0 && <p className="text-xs text-brand-ice/70">No Shorts scheduled</p>}
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
+
+      <details className="border-t border-brand-border pt-3 text-sm text-brand-ice/85">
+        <summary className="w-fit cursor-pointer rounded px-1 py-1 font-semibold text-brand-ice">Publishing stats</summary>
+        <p className="mt-2 text-xs text-brand-ice/75">{viewMode === 'month' ? monthTitle : 'All dates'} · {LANGUAGES.find(({ id }) => id === selectedLanguage)?.label}</p>
+        <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[
+            ['Shorts on calendar', summary.total],
+            ['Fun Fact days', summary.fun_fact_days],
+            ['Complete publishing days', summary.triad_complete_days],
+            ['Partially filled days', summary.triad_partial_days],
+          ].map(([label, value]) => (
+            <div key={label} className="border-t border-brand-border pt-2">
+              <dt className="text-xs">{label}</dt>
+              <dd className="mt-1 text-lg font-semibold tabular-nums text-white">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-3 text-xs text-brand-ice/75">A complete day has one Expression, one Game, and one Roleplay for a language.</p>
+      </details>
 
       {/* Centered Click-to-Inspect Day Detail Pop-up Modal */}
       {inspectedIsoDate && (
@@ -1143,7 +976,8 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
                   onClick={() => {
                     setSelectedIsoDate(inspectedIsoDate);
                     setInspectedIsoDate(null);
-                    setTimeout(() => scriptIdInputRef.current?.focus(), 0);
+                    setSchedulerOpen(true);
+                    requestAnimationFrame(() => scriptIdInputRef.current?.focus());
                   }}
                   className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:opacity-95 text-white text-xs font-bold flex items-center gap-1.5 shadow cursor-pointer"
                 >
@@ -1226,7 +1060,7 @@ export const LaunchCalendarView: React.FC<LaunchCalendarViewProps> = ({
                               <button
                                 type="button"
                                 aria-label={`Remove ${item.id} from calendar`}
-                                title={`Unschedule ${item.id} (reverts Bingo card to Green)`}
+                                title={`Unschedule ${item.id}`}
                                 onClick={() => handleUnschedule(item)}
                                 className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 cursor-pointer"
                               >

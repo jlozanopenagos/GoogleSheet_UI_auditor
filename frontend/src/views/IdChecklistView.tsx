@@ -50,7 +50,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
   // Matrix state & memory cache
   const [items, setItems] = useState<MatrixItem[]>([]);
   const [sheetUrl, setSheetUrl] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [cache, setCache] = useState<Record<string, MatrixCategoryData>>({});
 
   // Active / Selected tile for quick inspection popover
@@ -110,7 +110,8 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
         const q = searchQuery.trim().toUpperCase();
         const matchesId = item.id.toUpperCase().includes(q);
         const matchesExpr = item.expression.toUpperCase().includes(q);
-        if (!matchesId && !matchesExpr) return false;
+        const matchesTitle = (item.short_title || '').toUpperCase().includes(q);
+        if (!matchesId && !matchesExpr && !matchesTitle) return false;
       }
 
       return true;
@@ -166,7 +167,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
   return (
     <div className="flex flex-col gap-6 animate-fadeIn">
       {/* Top Controls: Language & Format Pickers */}
-      <div className="bg-brand-surface/90 border border-brand-border rounded-2xl p-5 shadow-xl backdrop-blur-sm flex flex-col gap-4">
+      <div className="bg-brand-surface/90 border border-brand-border rounded-2xl p-5  backdrop-blur-sm flex flex-col gap-4">
         {/* Row 1: Language Tabs */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-brand-border/60 pb-4">
           <div className="flex items-center gap-2">
@@ -242,117 +243,6 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
         </div>
       </div>
 
-      {/* Progress & 3-State Metrics Dashboard */}
-      <div className="bg-brand-surface/80 border border-brand-border rounded-2xl p-5 shadow-lg flex flex-col lg:flex-row items-center justify-between gap-6">
-        {/* Left: 4-State Metric Counters */}
-        <div className="flex flex-wrap items-center gap-5 sm:gap-6 w-full lg:w-auto">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-brand-ice/50 font-bold">Total IDs</div>
-            <div className="text-2xl font-extrabold text-white mono-font">{stats.total}</div>
-          </div>
-
-          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
-
-          {/* Violet Metric */}
-          <div className="flex flex-col">
-            <div className="text-[11px] uppercase tracking-wider text-violet-400 font-bold flex items-center gap-1">
-              <Rocket className="w-3.5 h-3.5" />
-              Violet (Launched)
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-violet-300 mono-font">{stats.violetCount}</span>
-              <span className="text-xs text-violet-400/70 font-semibold mono-font">({stats.violetPct}%)</span>
-            </div>
-            <span className="text-[10px] text-brand-ice/50">On Launch Calendar</span>
-          </div>
-
-          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
-
-          {/* Green Metric */}
-          <div className="flex flex-col">
-            <div className="text-[11px] uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Green (Ready)
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-emerald-300 mono-font">{stats.greenCount}</span>
-              <span className="text-xs text-emerald-400/70 font-semibold mono-font">({stats.greenPct}%)</span>
-            </div>
-            <span className="text-[10px] text-brand-ice/50">Script + Description ready</span>
-          </div>
-
-          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
-
-          {/* Yellow Metric */}
-          <div className="flex flex-col">
-            <div className="text-[11px] uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              Yellow (Script Only)
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-amber-300 mono-font">{stats.yellowCount}</span>
-              <span className="text-xs text-amber-400/70 font-semibold mono-font">({stats.yellowPct}%)</span>
-            </div>
-            <span className="text-[10px] text-brand-ice/50">Col D ready · Col I missing</span>
-          </div>
-
-          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
-
-          {/* Grey Metric */}
-          <div className="flex flex-col">
-            <div className="text-[11px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5" />
-              Grey (No Script)
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-extrabold text-slate-300 mono-font">{stats.greyCount}</span>
-              <span className="text-xs text-slate-400/70 font-semibold mono-font">({stats.greyPct}%)</span>
-            </div>
-            <span className="text-[10px] text-brand-ice/50">Col D empty</span>
-          </div>
-        </div>
-
-        {/* Right: Multi-Segmented Progress Bar */}
-        <div className="flex-1 max-w-lg w-full flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs font-bold">
-            <span className="text-brand-ice/70">Production & Launch Readiness</span>
-            <div className="flex items-center gap-3 text-[11px] mono-font">
-              <span className="text-violet-400 font-bold">{stats.violetPct}% Launched</span>
-              <span className="text-emerald-400 font-bold">{stats.greenPct}% Ready</span>
-              <span className="text-amber-400 font-bold">{stats.yellowPct}% Scripted</span>
-            </div>
-          </div>
-
-          {/* Multi-segmented Bar */}
-          <div className="w-full h-3.5 bg-brand-dark rounded-full overflow-hidden border border-brand-border/80 flex">
-            {/* Violet Segment */}
-            <div
-              className="h-full bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 transition-all duration-300 shadow-sm"
-              style={{ width: `${stats.violetPct}%` }}
-              title={`Violet (Launched): ${stats.violetCount} (${stats.violetPct}%)`}
-            />
-            {/* Green Segment */}
-            <div
-              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300 shadow-sm"
-              style={{ width: `${stats.greenPct}%` }}
-              title={`Green (Ready): ${stats.greenCount} (${stats.greenPct}%)`}
-            />
-            {/* Yellow Segment */}
-            <div
-              className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300 shadow-sm"
-              style={{ width: `${stats.yellowPct}%` }}
-              title={`Yellow: ${stats.yellowCount} (${stats.yellowPct}%)`}
-            />
-            {/* Grey Segment */}
-            <div
-              className="h-full bg-slate-700/60 transition-all duration-300"
-              style={{ width: `${stats.greyPct}%` }}
-              title={`Grey: ${stats.greyCount} (${stats.greyPct}%)`}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Filter & Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Filter Pills */}
@@ -366,7 +256,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            All IDs ({stats.total})
+            All IDs{!isLoading && ` (${stats.total})`}
           </button>
           <button
             type="button"
@@ -378,7 +268,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-violet-400" />
-            <span>Violet ({stats.violetCount})</span>
+            <span>Launched{!isLoading && ` (${stats.violetCount})`}</span>
           </button>
           <button
             type="button"
@@ -390,7 +280,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span>Green ({stats.greenCount})</span>
+            <span>Ready{!isLoading && ` (${stats.greenCount})`}</span>
           </button>
           <button
             type="button"
@@ -402,7 +292,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-amber-400" />
-            <span>Yellow ({stats.yellowCount})</span>
+            <span>Script only{!isLoading && ` (${stats.yellowCount})`}</span>
           </button>
           <button
             type="button"
@@ -414,7 +304,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-slate-500" />
-            <span>Grey ({stats.greyCount})</span>
+            <span>No script{!isLoading && ` (${stats.greyCount})`}</span>
           </button>
         </div>
 
@@ -425,7 +315,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by ID or topic..."
+            placeholder="Search by ID, topic, or title..."
             className="w-full pl-9 pr-3 py-1.5 bg-brand-surface border border-brand-border focus:border-brand-sky rounded-xl text-xs text-white placeholder-brand-ice/30 focus:outline-none mono-font"
           />
         </div>
@@ -433,7 +323,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
 
       {/* Selected Tile Quick Action Banner (When a tile is clicked) */}
       {activeItem && (
-        <div className="bg-brand-card border-2 border-brand-sky/60 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4 animate-slideDown">
+        <div className="bg-brand-card border-2 border-brand-sky/60 rounded-2xl p-4  flex flex-wrap items-center justify-between gap-4 animate-slideDown">
           <div className="flex items-center gap-3">
             <div
               className={`w-11 h-11 rounded-xl flex items-center justify-center font-extrabold mono-font text-sm border ${
@@ -476,10 +366,16 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
                 <span>Col D (Script): {activeItem.has_script_changed ? '✓ Filled' : '✗ Empty'}</span>
                 <span>Col E (Checked): {activeItem.script_ready ? '✓ Ready' : '○ Pending'}</span>
                 <span>Col I (Description): {activeItem.has_short_description ? '✓ Filled' : '✗ Empty'}</span>
+                <span>Col J (Title): {activeItem.has_short_title ? '✓ Filled' : '✗ Empty'}</span>
                 {activeItem.launch_date && (
                   <span className="text-violet-300 font-semibold">Launch: {activeItem.launch_date}</span>
                 )}
               </div>
+              {activeItem.short_title && (
+                <div className="text-xs text-brand-sky/90 mt-1 truncate max-w-2xl">
+                  Title: "{activeItem.short_title}"
+                </div>
+              )}
             </div>
           </div>
 
@@ -514,7 +410,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Open in Description Creator</span>
+              <span>Open in Title &amp; Description</span>
             </button>
           </div>
         </div>
@@ -562,9 +458,14 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
               }
 
               return (
-                <div
+                <button
+                  type="button"
                   key={item.id}
-                  title={`${item.id}: ${item.expression || 'No title'}\nStatus: ${
+                  aria-pressed={isSelected}
+                  aria-label={`${item.id} · ${{ violet: 'Launched', green: 'Ready', yellow: 'Script only', grey: 'No script' }[item.status]}`}
+                  title={`${item.id}: ${item.expression || 'No title'}\nTitle (Col J): ${
+                    item.short_title || 'Empty'
+                  }\nStatus: ${
                     item.status === 'violet'
                       ? `Violet (Launched on ${item.launch_date || 'YouTube Calendar'})`
                       : item.status === 'green'
@@ -579,7 +480,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
                     relative group h-12 w-full flex items-center justify-center rounded-xl font-bold mono-font text-sm
                     select-none transition-all duration-150 cursor-pointer border
                     ${tileClass}
-                    ${isSelected ? 'ring-2 ring-brand-sky border-brand-sky scale-105 shadow-lg shadow-brand-sky/20 z-10' : ''}
+                    ${isSelected ? 'ring-2 ring-brand-sky border-brand-sky scale-105  shadow-brand-sky/20 z-10' : ''}
                   `}
                 >
                   {/* ID Code ONLY */}
@@ -587,7 +488,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
 
                   {/* Status Indicator Dot */}
                   <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full ${badgeColor}`} />
-                </div>
+                </button>
               );
             })}
           </div>
@@ -598,7 +499,7 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
           <div className="flex flex-wrap items-center gap-4">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-violet-500/40 border border-violet-400/70" />
-              <strong className="text-violet-300">Violet:</strong> Launched (On Calendar)
+              <strong className="text-violet-300">Launched:</strong> On the calendar
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-full bg-emerald-500/30 border border-emerald-500/60" />
@@ -616,10 +517,126 @@ export const IdChecklistView: React.FC<IdChecklistViewProps> = ({
 
           <div className="flex items-center gap-1.5 text-[11px] text-brand-sky font-medium">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Click to inspect · Double-click to open in Auditor/Creator</span>
+            <span>Select an ID to inspect and open it</span>
           </div>
         </div>
       </div>
+      {!isLoading && items.length > 0 && (
+        <details className="border-t border-brand-border pt-3">
+          <summary className="cursor-pointer py-2 text-sm font-semibold text-brand-ice">Production &amp; launch summary</summary>
+      {/* Progress & 3-State Metrics Dashboard */}
+      <div className="bg-brand-surface/80 border border-brand-border rounded-2xl p-5  flex flex-col lg:flex-row items-center justify-between gap-6">
+        {/* Left: 4-State Metric Counters */}
+        <div className="flex flex-wrap items-center gap-5 sm:gap-6 w-full lg:w-auto">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-brand-ice/50 font-bold">Total IDs</div>
+            <div className="text-2xl font-extrabold text-white mono-font">{stats.total}</div>
+          </div>
+
+          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
+
+          {/* Violet Metric */}
+          <div className="flex flex-col">
+            <div className="text-[11px] uppercase tracking-wider text-violet-400 font-bold flex items-center gap-1">
+              <Rocket className="w-3.5 h-3.5" />
+              Launched
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-extrabold text-violet-300 mono-font">{stats.violetCount}</span>
+              <span className="text-xs text-violet-400/70 font-semibold mono-font">({stats.violetPct}%)</span>
+            </div>
+            <span className="text-[10px] text-brand-ice/50">On Launch Calendar</span>
+          </div>
+
+          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
+
+          {/* Green Metric */}
+          <div className="flex flex-col">
+            <div className="text-[11px] uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Ready
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-extrabold text-emerald-300 mono-font">{stats.greenCount}</span>
+              <span className="text-xs text-emerald-400/70 font-semibold mono-font">({stats.greenPct}%)</span>
+            </div>
+            <span className="text-[10px] text-brand-ice/50">Script + Description ready</span>
+          </div>
+
+          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
+
+          {/* Yellow Metric */}
+          <div className="flex flex-col">
+            <div className="text-[11px] uppercase tracking-wider text-amber-400 font-bold flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              Script only
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-extrabold text-amber-300 mono-font">{stats.yellowCount}</span>
+              <span className="text-xs text-amber-400/70 font-semibold mono-font">({stats.yellowPct}%)</span>
+            </div>
+            <span className="text-[10px] text-brand-ice/50">Col D ready · Col I missing</span>
+          </div>
+
+          <div className="h-8 w-[1px] bg-brand-border hidden sm:block" />
+
+          {/* Grey Metric */}
+          <div className="flex flex-col">
+            <div className="text-[11px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              No script
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-extrabold text-slate-300 mono-font">{stats.greyCount}</span>
+              <span className="text-xs text-slate-400/70 font-semibold mono-font">({stats.greyPct}%)</span>
+            </div>
+            <span className="text-[10px] text-brand-ice/50">Col D empty</span>
+          </div>
+        </div>
+
+        {/* Right: Multi-Segmented Progress Bar */}
+        <div className="flex-1 max-w-lg w-full flex flex-col gap-2">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="text-brand-ice/70">Production & Launch Readiness</span>
+            <div className="flex items-center gap-3 text-[11px] mono-font">
+              <span className="text-violet-400 font-bold">{stats.violetPct}% Launched</span>
+              <span className="text-emerald-400 font-bold">{stats.greenPct}% Ready</span>
+              <span className="text-amber-400 font-bold">{stats.yellowPct}% Scripted</span>
+            </div>
+          </div>
+
+          {/* Multi-segmented Bar */}
+          <div className="w-full h-3.5 bg-brand-dark rounded-full overflow-hidden border border-brand-border/80 flex">
+            {/* Violet Segment */}
+            <div
+              className="h-full bg-gradient-to-r from-violet-600 via-purple-500 to-fuchsia-500 transition-all duration-300 shadow-sm"
+              style={{ width: `${stats.violetPct}%` }}
+              title={`Launched: ${stats.violetCount} (${stats.violetPct}%)`}
+            />
+            {/* Green Segment */}
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300 shadow-sm"
+              style={{ width: `${stats.greenPct}%` }}
+              title={`Ready: ${stats.greenCount} (${stats.greenPct}%)`}
+            />
+            {/* Yellow Segment */}
+            <div
+              className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300 shadow-sm"
+              style={{ width: `${stats.yellowPct}%` }}
+              title={`Yellow: ${stats.yellowCount} (${stats.yellowPct}%)`}
+            />
+            {/* Grey Segment */}
+            <div
+              className="h-full bg-slate-700/60 transition-all duration-300"
+              style={{ width: `${stats.greyPct}%` }}
+              title={`Grey: ${stats.greyCount} (${stats.greyPct}%)`}
+            />
+          </div>
+        </div>
+      </div>
+
+        </details>
+      )}
     </div>
   );
 };
