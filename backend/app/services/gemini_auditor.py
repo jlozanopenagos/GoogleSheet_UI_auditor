@@ -29,13 +29,35 @@ EMOJI_PATTERN = re.compile(
 
 # Multilingual conversational intro patterns to strip
 CONVERSATIONAL_PREFIXES_REGEX = re.compile(
-    r"^(?:(?:Sure!?|Okay!?|Certainly!?|Here is|Here's|Here are)\s+(?:the|your|an?|this)?\s*(?:new|audited|revised|doctored|optimized|seo|youtube shorts?)?\s*(?:description|script|draft)?[:\s-]*|"
-    r"(?:Voici|Voilà)\s+(?:la|le|une|un)?\s*(?:description|script|version|texte)?[:\s-]*|"
-    r"(?:Aquí|Aca)\s+(?:está|tienes|va)?\s*(?:la|el|una|un)?\s*(?:descripción|guión|guion|texto)?[:\s-]*|"
-    r"(?:Ecco)\s+(?:la|il|uno|una)?\s*(?:descrizione|script|testo)?[:\s-]*|"
-    r"(?:Short Description|Description|Script|Doctored Script|Doctored Version|Revised Script)[:\s-]*)",
+    r"^(?:(?:Sure!?|Okay!?|Certainly!?|Here is|Here's|Here are)\s+(?:the|your|an?|this)?\s*(?:new|audited|revised|doctored|optimized|seo|youtube shorts?)?\s*(?:description|script|draft|thumbnail title|short title|title)?[:\s-]*|"
+    r"(?:Voici|Voilà)\s+(?:la|le|une|un)?\s*(?:description|script|version|texte|titre)?[:\s-]*|"
+    r"(?:Aquí|Aca)\s+(?:está|tienes|va)?\s*(?:la|el|una|un)?\s*(?:descripción|guión|guion|texto|título|titulo)?[:\s-]*|"
+    r"(?:Ecco)\s+(?:la|il|uno|una)?\s*(?:descrizione|script|testo|titolo)?[:\s-]*|"
+    r"(?:Short Description|Description|Script|Doctored Script|Doctored Version|Revised Script)\s*[:\-–—]?\s*|"
+    r"(?:Short Title|Thumbnail Title|Title|Titre|Título|Titolo)\s*[:\-–—]\s*)",
     flags=re.IGNORECASE | re.MULTILINE
 )
+
+# Leading format/category prefixes forbidden on thumbnail titles
+TITLE_CATEGORY_PREFIX_REGEX = re.compile(
+    r"^(?:[\[\(]\s*)?"
+    r"(?:quiz|game|juego|jeu|gioco|trivia|expression|expresi[óo]n|espressione|idiom|modismo|"
+    r"fun\s*facts?|dato\s*curioso|datos\s*curiosos|curiosidad|curiosit[éeàa]|"
+    r"role[\s-]*play|dialogue|di[áa]logo|dialogo|"
+    r"in\s+action|en\s+acci[óo]n|en\s+action|in\s+azione|origin|origen|origine)"
+    r"(?:\s*[\]\)]\s*[:|\-–—]?\s*|\s*[:|\-–—]\s*)",
+    flags=re.IGNORECASE
+)
+
+LATIN_ENGLISH_MARKERS = {
+    "the", "secret", "phrase", "luck", "stop", "saying", "instead", "wrong",
+    "tense", "truth", "about", "spelling", "word", "words", "how", "to",
+    "why", "never", "use", "ultimate", "trap", "chaos", "family",
+}
+
+
+def _normalize_for_comparison(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", (text or "").lower())).strip()
 
 # Bracketed and bold section labels copied by models from prompt guidelines
 SECTION_LABELS_REGEX = re.compile(
@@ -188,6 +210,70 @@ class GeminiAuditor:
 
         return True, "Valid"
 
+    def audit_title(
+        self,
+        clean: str,
+        finish_reason: str = "STOP",
+        expression: str = "",
+        video_type: str = "",
+        language: str = "",
+        previous_titles: Optional[List[str]] = None,
+    ) -> Tuple[bool, str]:
+        """
+        Audits a generated thumbnail/short title for single-line formatting, compact length,
+        absence of emojis/hashtags/prefixes, target language purity, non-laziness, and uniqueness.
+        """
+        if not clean or not clean.strip():
+            return False, "Title is empty"
+
+        if finish_reason == "MAX_TOKENS":
+            return False, "Response was truncated by token limit (finishReason=MAX_TOKENS)"
+        if finish_reason in ("SAFETY", "RECITATION", "OTHER"):
+            return False, f"Response was prematurely stopped by API (finishReason={finish_reason})"
+
+        if "\n" in clean:
+            return False, "Title must be a single line"
+
+        if EMOJI_PATTERN.search(clean):
+            return False, "Title must not contain emojis"
+        if "#" in clean:
+            return False, "Title must not contain hashtags"
+        if TITLE_CATEGORY_PREFIX_REGEX.match(clean):
+            return False, "Title must not start with a category prefix (e.g. Quiz:, In Action:)"
+
+        if len(clean) < 3:
+            return False, "Title is too short"
+        if len(clean) > 65:
+            return False, f"Title exceeds thumbnail readability limit ({len(clean)} chars; expected <= 65)"
+
+        words = clean.split()
+        if len(words) > 11:
+            return False, f"Title has too many words ({len(words)} words; expected <= 11)"
+
+        norm_clean = _normalize_for_comparison(clean)
+        norm_expr = _normalize_for_comparison(expression)
+        vtype_norm = (video_type or "").strip().lower()
+        if norm_expr and norm_clean == norm_expr:
+            if not (vtype_norm == "game" and "?" in clean and "?" not in expression):
+                return False, "Title merely repeats the raw expression without script context"
+
+        lang_norm = (language or "").strip().lower()
+        if lang_norm in ("french", "spanish", "italian"):
+            lower_clean = clean.lower()
+            if lower_clean.startswith(("the secret ", "stop saying ", "stop using ", "how to ")):
+                return False, f"Title contains English leakage for {lang_norm}"
+            alpha_words = re.findall(r"[a-zA-Z]+", lower_clean)
+            if len(alpha_words) >= 3:
+                eng_hits = sum(1 for w in alpha_words if w in LATIN_ENGLISH_MARKERS)
+                if (eng_hits / len(alpha_words)) >= 0.4:
+                    return False, f"Title appears to be in English instead of {lang_norm}"
+
+        for prev in previous_titles or []:
+            if prev and _normalize_for_comparison(prev) == norm_clean:
+                return False, f"Title duplicates previously generated/saved title '{prev}'"
+
+        return True, "Valid"
+
     def execute_with_audit(
         self,
         system_prompt: str,
@@ -197,6 +283,7 @@ class GeminiAuditor:
         max_output_tokens: Optional[int] = None,
         max_attempts_per_model: Optional[int] = None,
         timeout: Optional[int] = None,
+        base_temperature: float = 0.75,
     ) -> Tuple[str, str, str]:
         """
         Executes Gemini generation with multi-model fallback and at least 3 attempts per model.
@@ -218,7 +305,7 @@ class GeminiAuditor:
             endpoint = f"{self.base_url}/{cur_model}:generateContent?key={self.api_key}"
 
             for attempt in range(1, attempts_limit + 1):
-                current_temp = round(0.75 + ((attempt - 1) * 0.05), 2)
+                current_temp = round(min(1.2, base_temperature + ((attempt - 1) * 0.05)), 2)
                 payload = {
                     "system_instruction": {
                         "parts": [{"text": system_prompt}]

@@ -20,11 +20,12 @@ Instead of manually navigating multiple Google Sheets files in a browser, creato
    - `core/routing.py`: Parses canonical IDs and resolves them to their corresponding Google Sheet ID and tab.
    - `services/sheet_service.py`: Handles resilient HTTP communication with the Google Apps Script Web App (redirects, retries, payload serialization).
    - `services/prompt_service.py`: Generates format-specific, high-CTR YouTube Shorts description prompts.
-   - `services/gemini_service.py`: Manages the Gemini API client, response validation, emoji sanitization, and hashtag verification.
+   - `services/title_prompt_service.py`: Generates format-specific, compact thumbnail title prompts (2–7 words, ≤ 45 chars ideal, triad-differentiated, zero emojis/prefixes, rotating creative angles).
+   - `services/gemini_service.py`: Manages the Gemini API client, response validation, emoji sanitization, title auditing, and hashtag verification.
 2. **Open/Closed Principle (OCP)**:
    - Format prompt strategies are decoupled into modular strategies (`ExpressionPromptStrategy`, `GamePromptStrategy`, `RoleplayPromptStrategy`, `FunFactsPromptStrategy`), allowing easy addition of new content types or tuning without touching the orchestration engine.
 3. **Liskov Substitution & Interface Segregation (LSP / ISP)**:
-   - Clean, strict Pydantic models and TypeScript contracts (`ScriptRecord`, `UpdateScriptRequest`, `UpdateDescriptionRequest`, `UpdateTitleRequest`, `GeminiGenerateRequest`, `CalendarCheckRequest`, `CalendarScheduleRequest`) ensure explicit data boundaries between frontend and backend.
+   - Clean, strict Pydantic models and TypeScript contracts (`ScriptRecord`, `UpdateScriptRequest`, `UpdateDescriptionRequest`, `UpdateTitleRequest`, `GeminiGenerateRequest`, `GeminiTitleGenerateRequest`, `CalendarCheckRequest`, `CalendarScheduleRequest`) ensure explicit data boundaries between frontend and backend.
 4. **Don't Repeat Yourself (DRY)**:
    - The frontend shares the canonical `IdSearchBar` component across Tab 1 (Script auditor) and Tab 2 (Title & description).
    - `ScriptAuditorView` and `DescriptionCreationView` follow a consistent side-by-side read-only reference vs. editable panel layout with collapsible mobile reference drawers.
@@ -101,7 +102,7 @@ When the user submits an ID into the search bar:
 
 ### Tab 2: "Title & description"
 - **Header**: `Editing <ID>: <expression_name>`
-- **Short Title Card (Column J)**: Always visible for the selected ID; displays whether a title is already saved in Column J, supports 1-click copy, live 100-char counter, and manual editing/saving (non-empty text required).
+- **Short Title Card (Column J)**: Always visible for the selected ID; displays whether a title is already saved in Column J, supports 1-click copy, live `100`-char counter with thumbnail readability indicator, manual editing/saving (non-empty text required), and **Generate title with Gemini** (requires Column D, fills input for review/regeneration with no auto-save, avoids `previous_titles`).
 - **If Column I has content**:
   - Left Box: Read-only Column I content.
   - Right Box: Editable Column I content + Save Button.

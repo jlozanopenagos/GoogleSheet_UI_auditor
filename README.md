@@ -31,8 +31,8 @@ The auditor handles editorial script review, Short titles (Column J), Gemini SEO
    - Shared ID search bar and active script context.
    - **Short Title Card (Column J)** *(always visible for the selected ID)*:
      - Shows whether a title is already saved in Column J (`Title saved` vs `No saved title`).
-     - Supports manual input/editing, non-empty validation, 1-click **Copy title**, and a live `100`-character YouTube title length counter (with amber warning if > 100 chars).
-     - Saves directly to Column J (`short_title`) via **Save title**.
+     - Supports manual input/editing, non-empty validation, 1-click **Copy title**, and a live `100`-character YouTube title length counter (plus thumbnail readability guidance for ≤ 45 chars).
+     - **Generate title with Gemini**: Uses Column D (`SCRIPT_CHANGED`, strictly required) and format-specific thumbnail rules (2–7 words, zero emojis/prefixes/spoilers, triad differentiation across `E`/`G`/`R`, and rotating creative angles with `previous_titles` memory so every retry produces a fresh title). Fills the input box for review/editing before clicking **Save title**.
    - **When Column I has content**:
      - Left box: Current Column I (`short_description`), read-only with copy button.
      - Right box: Editable Column I + Save button.

@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 import requests
 
-from app.services.gemini_service import GeminiService
+from app.services.gemini_service import GeminiService, GeminiServiceError
 from helpers import make_gemini_ok_response, make_valid_description
 
 pytestmark = pytest.mark.unit
@@ -93,3 +93,38 @@ def test_generate_short_description_validation_retry_success(mock_post, mock_sle
     assert result.script_id == "IE07"
     assert "#LearnItalian" in result.hashtags
     assert mock_post.call_count == 2
+
+
+@patch("time.sleep", return_value=None)
+@patch("requests.post")
+def test_generate_short_title_validation_and_retry_success(mock_post, mock_sleep):
+    svc = GeminiService(api_key="mock_key", model="gemini-2.5-flash")
+
+    # Missing Column D is blocked
+    with pytest.raises(GeminiServiceError, match="Column D"):
+        svc.generate_short_title("EE01", "Break a leg", "   ")
+
+    # Missing API key is blocked
+    no_key_svc = GeminiService(api_key="", model="gemini-2.5-flash")
+    no_key_svc.api_key = ""
+    with pytest.raises(GeminiServiceError, match="GEMINI_API_KEY"):
+        no_key_svc.generate_short_title("EE01", "Break a leg", "Final script text")
+
+    # Retry rejects duplicate/emoji title and accepts fresh valid title
+    dup_resp = make_gemini_ok_response("The old theater lucky secret", finish_reason="STOP")
+    emoji_resp = make_gemini_ok_response("Backstage curse 😬", finish_reason="STOP")
+    ok_resp = make_gemini_ok_response("Why good luck fails backstage", finish_reason="STOP")
+    mock_post.side_effect = [dup_resp, emoji_resp, ok_resp]
+
+    result = svc.generate_short_title(
+        script_id="ee01",
+        expression="Break a leg",
+        script_changed="Stop wishing someone good luck backstage at a theater!",
+        previous_titles=["The old theater lucky secret"],
+    )
+    assert result.script_id == "EE01"
+    assert result.short_title == "Why good luck fails backstage"
+    assert result.word_count == 5
+    assert result.character_count == len("Why good luck fails backstage")
+    assert result.angle_used
+    assert mock_post.call_count == 3

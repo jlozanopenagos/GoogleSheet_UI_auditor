@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   fetchScriptById,
   updateTitleField,
+  generateGeminiTitle,
   scheduleCalendarId,
   syncCalendarFromSheets,
 } from '../services/api';
@@ -119,5 +120,48 @@ describe('API service client', () => {
     await expect(updateTitleField({ script_id: 'EE01', short_title: '' })).rejects.toThrow(
       'Short title cannot be empty.'
     );
+  });
+
+  it('generateGeminiTitle posts payload with previous_titles and throws on error responses', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'Generated',
+        data: {
+          script_id: 'EE01',
+          short_title: 'Why good luck fails backstage',
+          word_count: 5,
+          character_count: 29,
+          angle_used: 'Curiosity Question',
+        },
+      }),
+    });
+
+    const res = await generateGeminiTitle({
+      script_id: 'EE01',
+      expression: 'Break a leg',
+      script_changed: 'Final script',
+      previous_titles: ['The old theater lucky secret'],
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/gemini/generate-title', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        script_id: 'EE01',
+        expression: 'Break a leg',
+        script_changed: 'Final script',
+        previous_titles: ['The old theater lucky secret'],
+      }),
+    });
+    expect(res.short_title).toBe('Why good luck fails backstage');
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ detail: 'Column D is empty' }),
+    });
+    await expect(
+      generateGeminiTitle({ script_id: 'EE01', expression: 'Break a leg', script_changed: '' })
+    ).rejects.toThrow('Column D is empty');
   });
 });

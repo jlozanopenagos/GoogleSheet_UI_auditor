@@ -46,6 +46,21 @@ export interface GeminiGenerateResult {
   hashtags: string[];
 }
 
+export interface GeminiTitleGeneratePayload {
+  script_id: string;
+  expression: string;
+  script_changed: string;
+  previous_titles?: string[];
+}
+
+export interface GeminiTitleGenerateResult {
+  script_id: string;
+  short_title: string;
+  word_count: number;
+  character_count: number;
+  angle_used?: string;
+}
+
 export interface DoctorScriptPayload {
   script_id: string;
   expression: string;

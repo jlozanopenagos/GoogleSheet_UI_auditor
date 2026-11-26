@@ -5,6 +5,8 @@ import {
   UpdateTitlePayload,
   GeminiGeneratePayload,
   GeminiGenerateResult,
+  GeminiTitleGeneratePayload,
+  GeminiTitleGenerateResult,
   DoctorScriptPayload,
   DoctorScriptResult,
   MatrixCategoryData,
@@ -88,6 +90,21 @@ export async function generateGeminiDescription(payload: GeminiGeneratePayload):
   const json: ApiResponse<GeminiGenerateResult> = await resp.json();
   if (!resp.ok || !json.success || !json.data) {
     throw new Error(json.message || json.error || 'Gemini generation failed.');
+  }
+
+  return json.data;
+}
+
+export async function generateGeminiTitle(payload: GeminiTitleGeneratePayload): Promise<GeminiTitleGenerateResult> {
+  const resp = await fetch(`${API_BASE}/gemini/generate-title`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const json: ApiResponse<GeminiTitleGenerateResult> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || 'Gemini title generation failed.');
   }
 
   return json.data;

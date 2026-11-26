@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import (
     GeminiGenerateRequest,
+    GeminiTitleGenerateRequest,
     DoctorScriptRequest,
     ApiResponse
 )
@@ -42,6 +43,31 @@ def generate_description(payload: GeminiGenerateRequest) -> ApiResponse:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception(f"Unexpected error in Gemini generation: {e}")
+        raise HTTPException(status_code=500, detail=f"Gemini API failure: {e}")
+
+
+@router.post("/generate-title", response_model=ApiResponse)
+def generate_title(payload: GeminiTitleGenerateRequest) -> ApiResponse:
+    """Generates a fresh, thumbnail-ready YouTube Shorts title using Google Gemini API."""
+    try:
+        response = gemini_service.generate_short_title(
+            script_id=payload.script_id,
+            expression=payload.expression,
+            script_changed=payload.script_changed,
+            previous_titles=payload.previous_titles,
+        )
+        return ApiResponse(
+            success=True,
+            message="Thumbnail title generated successfully.",
+            data=response.model_dump()
+        )
+    except IdRoutingError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except GeminiServiceError as e:
+        logger.warning(f"Gemini title generation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Unexpected error in Gemini title generation: {e}")
         raise HTTPException(status_code=500, detail=f"Gemini API failure: {e}")
 
 

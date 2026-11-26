@@ -63,6 +63,24 @@ class GeminiGenerateResponse(BaseModel):
     hashtags: List[str] = Field(default_factory=list)
 
 
+class GeminiTitleGenerateRequest(BaseModel):
+    script_id: str = Field(..., description="Canonical ID (e.g. EE01)")
+    expression: str = Field(..., description="Target expression or topic (Column B)")
+    script_changed: str = Field(..., description="Spoken script text from Column D (required)")
+    previous_titles: List[str] = Field(
+        default_factory=list,
+        description="Previously saved or generated titles to avoid repeating",
+    )
+
+
+class GeminiTitleGenerateResponse(BaseModel):
+    script_id: str
+    short_title: str
+    word_count: int
+    character_count: int
+    angle_used: str = ""
+
+
 class MatrixItem(BaseModel):
     id: str
     script_ready: bool = False

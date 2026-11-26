@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Optional, Tuple
 
 from ..core.config import settings
 from ..core.routing import parse_and_route_id, ParsedId
-from ..models.schemas import GeminiGenerateResponse
+from ..models.schemas import GeminiGenerateResponse, GeminiTitleGenerateResponse
 from .prompt_service import PromptService
+from .title_prompt_service import TitlePromptService
 from .gemini_auditor import gemini_auditor, GeminiAuditor, GeminiAuditorError
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,81 @@ class GeminiService:
             word_count=len(words),
             character_count=len(clean_desc),
             hashtags=hashtags
+        )
+
+    def generate_short_title(
+        self,
+        script_id: str,
+        expression: str,
+        script_changed: str,
+        previous_titles: Optional[List[str]] = None,
+    ) -> GeminiTitleGenerateResponse:
+        """
+        Generates a fresh, thumbnail-optimized YouTube Shorts title from Column D script context
+        using format-specific guidelines and GeminiAuditor validation.
+        """
+        if not self.api_key:
+            raise GeminiServiceError(
+                "GEMINI_API_KEY is not configured in .env. Please provide a valid Gemini API key."
+            )
+
+        if not script_changed or not script_changed.strip():
+            raise GeminiServiceError(
+                "Cannot generate title: Column D (SCRIPT_CHANGED) is empty! "
+                "Please finalize the script in the Script auditor tab before using Gemini."
+            )
+
+        parsed: ParsedId = parse_and_route_id(script_id)
+        angle_name, angle_guidance = TitlePromptService.pick_creative_angle(parsed.video_type)
+        system_prompt = TitlePromptService.build_system_prompt(parsed.video_type, parsed.language)
+        user_prompt = TitlePromptService.build_user_prompt(
+            expression=expression,
+            script_changed=script_changed,
+            video_type=parsed.video_type,
+            language=parsed.language,
+            angle_name=angle_name,
+            angle_guidance=angle_guidance,
+            previous_titles=previous_titles,
+        )
+
+        auditor = GeminiAuditor(
+            api_key=self.api_key,
+            primary_model=self.model,
+            fallback_models=settings.gemini_fallback_models,
+            base_url=self.base_url,
+        )
+
+        def title_validator(clean_text: str, finish_reason: str) -> Tuple[bool, str]:
+            return auditor.audit_title(
+                clean=clean_text,
+                finish_reason=finish_reason,
+                expression=expression,
+                video_type=parsed.video_type,
+                language=parsed.language,
+                previous_titles=previous_titles,
+            )
+
+        try:
+            clean_title, _finish_reason, _used_model = auditor.execute_with_audit(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                validator_fn=title_validator,
+                script_id=parsed.canonical_id,
+                max_output_tokens=200,
+                max_attempts_per_model=settings.gemini_max_retries_per_model,
+                timeout=settings.request_timeout,
+                base_temperature=0.92,
+            )
+        except GeminiAuditorError as e:
+            raise GeminiServiceError(str(e)) from e
+
+        normalized_title = " ".join(clean_title.split())
+        return GeminiTitleGenerateResponse(
+            script_id=parsed.canonical_id,
+            short_title=normalized_title,
+            word_count=len(normalized_title.split()),
+            character_count=len(normalized_title),
+            angle_used=angle_name,
         )
 
     def _extract_text_and_finish_reason(self, data: Dict[str, Any]) -> Tuple[str, str]:

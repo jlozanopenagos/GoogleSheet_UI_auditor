@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, PenTool, Copy, Check, Save, Loader2, AlertCircle, RefreshCw, ExternalLink, Type } from 'lucide-react';
 import { ScriptRecord } from '../types';
-import { updateDescriptionField, updateTitleField, generateGeminiDescription } from '../services/api';
+import { updateDescriptionField, updateTitleField, generateGeminiDescription, generateGeminiTitle } from '../services/api';
 
 interface DescriptionCreationViewProps {
   script: ScriptRecord | null;
@@ -27,6 +27,8 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
   const [initialTitle, setInitialTitle] = useState('');
   const [shortTitle, setShortTitle] = useState('');
   const [isUpdatingTitle, setIsUpdatingTitle] = useState(false);
+  const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [previousTitles, setPreviousTitles] = useState<string[]>([]);
   const [titleCopied, setTitleCopied] = useState(false);
 
   // Reset transient mode flags when switching script ID
@@ -34,6 +36,7 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
     if (script) {
       setManualModeActive(false);
       setGeminiResult(null);
+      setPreviousTitles([]);
       setTitleCopied(false);
     }
   }, [script?.ID]);
@@ -86,8 +89,45 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
   const hasExistingTitle = initialTitle.trim().length > 0;
   const trimmedTitle = shortTitle.trim();
   const hasTitleChanged = trimmedTitle !== initialTitle.trim();
-  const isTitleSaveEnabled = hasTitleChanged && trimmedTitle.length > 0 && !isUpdatingTitle;
+  const isTitleSaveEnabled = hasTitleChanged && trimmedTitle.length > 0 && !isUpdatingTitle && !isGeneratingTitle;
   const titleCharCount = shortTitle.length;
+
+  const handleGeminiGenerateTitle = async () => {
+    if (!script.SCRIPT_CHANGED || !script.SCRIPT_CHANGED.trim()) {
+      onError(
+        'Column D (script revision) is required to generate a thumbnail title. Please finalize the script first in the Script auditor tab before using Gemini.'
+      );
+      return;
+    }
+
+    setIsGeneratingTitle(true);
+    try {
+      const avoidList = Array.from(
+        new Set(
+          [initialTitle.trim(), ...previousTitles, trimmedTitle].filter((t) => t.length > 0)
+        )
+      );
+
+      const res = await generateGeminiTitle({
+        script_id: script.ID,
+        expression: script.expression,
+        script_changed: script.SCRIPT_CHANGED,
+        previous_titles: avoidList,
+      });
+
+      setShortTitle(res.short_title);
+      setPreviousTitles((prev) =>
+        prev.includes(res.short_title) ? prev : [...prev, res.short_title]
+      );
+      onSuccess(
+        `Gemini generated thumbnail title (${res.word_count} words, ${res.character_count} chars). Click 'Save title' to apply or regenerate for another angle.`
+      );
+    } catch (err: any) {
+      onError(err.message || 'Gemini title generation failed.');
+    } finally {
+      setIsGeneratingTitle(false);
+    }
+  };
 
   const handleCopyTitle = async () => {
     if (!trimmedTitle) return;
@@ -271,10 +311,34 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
             aria-label="Short title"
             value={shortTitle}
             onChange={(e) => setShortTitle(e.target.value)}
-            disabled={isUpdatingTitle}
-            placeholder="Enter a YouTube Shorts title"
+            disabled={isUpdatingTitle || isGeneratingTitle}
+            placeholder="Enter a YouTube Shorts title or generate one with Gemini"
             className="flex-1 px-4 py-2.5 bg-brand-input border border-brand-border focus:border-brand-sky rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-sky/40 transition-all"
           />
+          <button
+            type="button"
+            onClick={handleGeminiGenerateTitle}
+            disabled={isGeneratingTitle || isUpdatingTitle}
+            title="Generate a fresh thumbnail title from Column D using Gemini"
+            className="px-4 py-2.5 bg-brand-card hover:bg-brand-wine/70 border border-brand-border hover:border-brand-amethyst text-brand-ice rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 whitespace-nowrap cursor-pointer"
+          >
+            {isGeneratingTitle ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-brand-sky" />
+                <span>Generating...</span>
+              </>
+            ) : previousTitles.length > 0 ? (
+              <>
+                <RefreshCw className="w-4 h-4 text-brand-sky" />
+                <span>New title with Gemini</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-brand-sky" />
+                <span>Generate title with Gemini</span>
+              </>
+            )}
+          </button>
           <button
             type="button"
             onClick={handleSaveTitle}
@@ -304,11 +368,18 @@ export const DescriptionCreationView: React.FC<DescriptionCreationViewProps> = (
             {hasExistingTitle ? (
               <>Current in sheet: <span className="text-brand-ice/90 font-medium">"{initialTitle}"</span></>
             ) : (
-              'Enter a title to save it.'
+              'Enter a title or generate one from Column D with Gemini, then click Save title.'
             )}
           </span>
-          <span className={`mono-font font-semibold ${titleCharCount > 100 ? 'text-amber-400' : 'text-brand-ice/75'}`}>
-            {titleCharCount} / 100 chars{titleCharCount > 100 ? ' (exceeds YouTube 100-char limit)' : ''}
+          <span className={`mono-font font-semibold ${titleCharCount > 65 ? 'text-amber-400' : 'text-brand-ice/75'}`}>
+            {titleCharCount} / 100 chars
+            {titleCharCount > 100
+              ? ' (exceeds YouTube 100-char limit)'
+              : titleCharCount > 65
+              ? ' (long for thumbnail)'
+              : titleCharCount > 0 && titleCharCount <= 45
+              ? ' · Ideal for thumbnail'
+              : ''}
           </span>
         </div>
       </div>

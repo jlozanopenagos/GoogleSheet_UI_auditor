@@ -33,6 +33,11 @@ def test_get_model_chain_deduplication():
         ("Voilà la version :\nTexte réel.", "Texte réel."),
         ("Aquí está la descripción:\nTexto real.", "Texto real."),
         ("Ecco la descrizione:\nTesto reale.", "Testo reale."),
+        ("Title: The old theater lucky secret", "The old theater lucky secret"),
+        ("Thumbnail Title: Tomber où?", "Tomber où?"),
+        ("Titre : Un saint accident!", "Un saint accident!"),
+        ("Título: Ropa invaluable", "Ropa invaluable"),
+        ("Titolo: Cose di famiglia", "Cose di famiglia"),
     ],
 )
 def test_sanitize_output_multilingual_intros(raw: str, expected: str):
@@ -150,3 +155,71 @@ def test_all_models_fail_raises_gemini_auditor_error(mock_post, mock_sleep):
             validator_fn=auditor.audit_description,
             script_id="IE01",
         )
+
+
+def test_audit_title_valid_and_rejections():
+    auditor = GeminiAuditor(api_key="mock_key")
+
+    ok, reason = auditor.audit_title(
+        "The old theater lucky secret",
+        finish_reason="STOP",
+        expression="Break a leg",
+        video_type="expression",
+        language="english",
+        previous_titles=["Another title"],
+    )
+    assert ok
+    assert reason == "Valid"
+
+    # Rejects empty and MAX_TOKENS
+    assert not auditor.audit_title("", finish_reason="STOP")[0]
+    assert not auditor.audit_title("Short", finish_reason="MAX_TOKENS")[0]
+
+    # Rejects multiline, emojis, hashtags, and category prefixes
+    assert not auditor.audit_title("Line one\nLine two")[0]
+    assert not auditor.audit_title("Lucky secret 😬")[0]
+    assert not auditor.audit_title("Lucky secret #Shorts")[0]
+    assert not auditor.audit_title("Quiz: REcord or reCORD?")[0]
+    assert not auditor.audit_title("In Action: Piece of cake")[0]
+
+    # Rejects bare/lazy repetition of the expression
+    bad_lazy, lazy_msg = auditor.audit_title(
+        "Break a leg!",
+        expression="Break a leg",
+        video_type="expression",
+        language="english",
+    )
+    assert not bad_lazy
+    assert "raw expression" in lazy_msg
+
+    # Allows genuine game question contrast
+    ok_game, _ = auditor.audit_title(
+        "REcord or reCORD?",
+        expression="REcord vs reCORD",
+        video_type="game",
+        language="english",
+    )
+    assert ok_game
+
+    # Rejects duplicates from previous_titles
+    bad_dup, dup_msg = auditor.audit_title(
+        "Tomber où ?",
+        expression="Tomber dans les pommes",
+        video_type="expression",
+        language="french",
+        previous_titles=["Tomber où?"],
+    )
+    assert not bad_dup
+    assert "duplicates" in dup_msg
+
+    # Rejects English leakage in non-English languages
+    bad_leak, _ = auditor.audit_title(
+        "The secret phrase for theater luck",
+        expression="Poser un lapin",
+        video_type="expression",
+        language="french",
+    )
+    assert not bad_leak
+
+    # Rejects overly long thumbnail title (> 65 chars)
+    assert not auditor.audit_title("A" * 66)[0]
