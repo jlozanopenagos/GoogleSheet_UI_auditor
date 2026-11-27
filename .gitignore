@@ -47,4 +47,9 @@ logs/
 htmlcov/
 backend/data/launch_calendar.json
 
+# YouTube & Google Drive OAuth Secrets / Tokens / Local Upload Log
+backend/credentials/*.json
+backend/data/youtube_tokens/
+backend/data/youtube_uploads.json
+
 

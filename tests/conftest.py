@@ -27,17 +27,33 @@ for _p in (str(BACKEND_DIR), str(TESTS_DIR)):
 # pyrefly: ignore[missing-import]
 from app.services.calendar_service import CalendarService  # noqa: E402
 # pyrefly: ignore[missing-import]
+from app.services.youtube_auth_service import YouTubeAuthService  # noqa: E402
+# pyrefly: ignore[missing-import]
+from app.services.youtube_upload_service import YouTubeUploadService  # noqa: E402
+# pyrefly: ignore[missing-import]
 from main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def isolate_calendar_and_network(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> Iterator[CalendarService]:
-    """Isolates CalendarService storage to a temp directory and blocks unmocked `requests` HTTP calls."""
+    """Isolates CalendarService, YouTube auth/upload storage to a temp directory and blocks unmocked `requests` HTTP calls."""
     with tempfile.TemporaryDirectory() as tmp_dir:
-        isolated_cal = CalendarService(storage_path=Path(tmp_dir) / "launch_calendar.json")
+        tmp_path = Path(tmp_dir)
+        isolated_cal = CalendarService(storage_path=tmp_path / "launch_calendar.json")
         monkeypatch.setattr("app.services.calendar_service.calendar_service", isolated_cal)
         monkeypatch.setattr("app.services.sheet_service.calendar_service", isolated_cal)
         monkeypatch.setattr("app.routers.calendar.calendar_service", isolated_cal)
+        monkeypatch.setattr("app.routers.youtube.calendar_service", isolated_cal)
+
+        isolated_yt_auth = YouTubeAuthService(tokens_dir=tmp_path / "youtube_tokens")
+        monkeypatch.setattr("app.services.youtube_auth_service.youtube_auth_service", isolated_yt_auth)
+        monkeypatch.setattr("app.services.drive_asset_service.youtube_auth_service", isolated_yt_auth)
+        monkeypatch.setattr("app.services.youtube_upload_service.youtube_auth_service", isolated_yt_auth)
+        monkeypatch.setattr("app.routers.youtube.youtube_auth_service", isolated_yt_auth)
+
+        isolated_yt_upload = YouTubeUploadService(history_path=tmp_path / "youtube_uploads.json")
+        monkeypatch.setattr("app.services.youtube_upload_service.youtube_upload_service", isolated_yt_upload)
+        monkeypatch.setattr("app.routers.youtube.youtube_upload_service", isolated_yt_upload)
 
         if "live_smoke" not in request.keywords:
             def _blocked_http_request(*args, **kwargs):

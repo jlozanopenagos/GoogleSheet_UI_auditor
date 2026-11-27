@@ -69,6 +69,13 @@ The auditor handles editorial script review, Short titles (Column J), Gemini SEO
    - Syncs launch status to Column G (`video_ready`) and Column H (`video_date` plain-text `DD/MM/YY` via `.setNumberFormat("@")`) in Google Sheets alongside `backend/data/launch_calendar.json`, turning scheduled IDs **Violet** inside the Bingo matrix (or reverting them to **Green** when unscheduled).
    - Includes a **"Sync from Sheets"** button (`POST /api/calendar/sync`) to pull scheduled IDs across all 16 Google Sheet tabs onto any PC.
 
+6. **Tab 5: YouTube Upload (Multi-Channel OAuth + Google Drive)**:
+   - Connects **Google Drive** (read-only) and each of the **4 language Brand Account YouTube channels** (`English`, `French`, `Spanish`, `Italian`) independently using a single `backend/credentials/client_secret.json` (see [`backend/credentials/README.md`](./backend/credentials/README.md)).
+   - Automatically locates finished assets in Google Drive under `_videos terminados/<language>/<video_type>/<ID>/` (`<ID>.mp4` + thumbnail PNGs) and reads Title (Column J) & Description (Column I) directly from Google Sheets.
+   - For Spanish Shorts with both **LatAm** and **Spain** thumbnail variants, renders side-by-side previews and requires an explicit selection before upload.
+   - Supports **Schedule for Public** (`privacyStatus="private"` + UTC ISO 8601 `publishAt` converted from **America/Bogota, UTC-05:00**, with user-entered launch hour), **Publish Now (Public)**, or **Private Draft**.
+   - Waits for YouTube processing (`processingDetails.processingStatus == "succeeded"`) before calling `thumbnails.set` (with a 1-click **Retry Thumbnail** fallback), and logs uploads locally in `backend/data/youtube_uploads.json` independently of Tab 4.
+
 ---
 
 ## Quick Start (Any Windows 11 PC or Tablet)
@@ -111,15 +118,16 @@ GoogleSheet_UI_auditor/
 ├── backend/
 │   ├── app/
 │   │   ├── core/               # Configuration (.env), canonical ID routing & sheet resolution
-│   │   ├── models/             # Typed Pydantic schemas (ScriptRecord, MatrixItem, Calendar schemas)
-│   │   ├── routers/            # /api/sheets, /api/gemini, /api/calendar (Launch Calendar API)
-│   │   └── services/           # SheetService, CalendarService, GeminiService, PromptService
+│   │   ├── models/             # Typed Pydantic schemas (ScriptRecord, MatrixItem, Calendar & YouTube schemas)
+│   │   ├── routers/            # /api/sheets, /api/gemini, /api/calendar, /api/youtube
+│   │   └── services/           # SheetService, CalendarService, GeminiService, PromptService, YouTube/Drive services
+│   ├── credentials/            # OAuth 2.0 client_secret.json (git-ignored) & setup README.md
 │   ├── main.py                 # FastAPI application factory & static SPA host
 │   └── requirements.txt        # Production Python dependencies
 ├── frontend/                   # React 19 + TypeScript + Vite + Tailwind CSS + Vitest
 │   ├── src/
-│   │   ├── components/         # Header, NavigationTabs (4 tabs), IdSearchBar, NotificationToast
-│   │   ├── views/              # ScriptAuditorView, DescriptionCreationView, IdChecklistView, LaunchCalendarView
+│   │   ├── components/         # Header, NavigationTabs (5 tabs), IdSearchBar, NotificationToast
+│   │   ├── views/              # ScriptAuditorView, DescriptionCreationView, IdChecklistView, LaunchCalendarView, YouTubeUploadView
 │   │   ├── services/           # Typed API fetch client
 │   │   ├── types/              # TypeScript interfaces
 │   │   └── __tests__/          # Vitest + React Testing Library unit/component suites
@@ -131,8 +139,8 @@ GoogleSheet_UI_auditor/
 │   ├── Code.gs                 # Reads A-J; explicit doPost actions (update_script, update_description, update_title, update_launch, batch_update)
 │   └── README.md               # 2-minute standalone deployment guide
 ├── tests/                      # Layered quality suite (isolated offline by conftest.py)
-│   ├── unit/                   # Routing, prompts, Gemini, Script Doctor, Calendar, SheetService
-│   ├── api/                    # FastAPI TestClient router contract tests
+│   ├── unit/                   # Routing, prompts, Gemini, Script Doctor, Calendar, SheetService, YouTube/Drive
+│   ├── api/                    # FastAPI TestClient router contract tests (sheets, gemini, calendar, youtube)
 │   ├── integration/            # End-to-end Calendar <-> Bingo 4-state workflows
 │   ├── contract/               # Structural verification against apps_script/Code.gs
 │   ├── conftest.py             # Temp CalendarService isolation & network guardrails

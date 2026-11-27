@@ -6,6 +6,7 @@ import { ScriptAuditorView } from './views/ScriptAuditorView';
 import { DescriptionCreationView } from './views/DescriptionCreationView';
 import { IdChecklistView } from './views/IdChecklistView';
 import { LaunchCalendarView } from './views/LaunchCalendarView';
+import { YouTubeUploadView } from './views/YouTubeUploadView';
 import { ActiveTab, ScriptRecord } from './types';
 import { fetchScriptById } from './services/api';
 
@@ -141,11 +142,59 @@ export const App: React.FC = () => {
             onSuccess={handleSuccess}
           />
         )}
+
+        {activeTab === 'youtube_upload' && (
+          <YouTubeUploadView
+            script={currentScript}
+            onOpenTab={(tab) => setActiveTab(tab)}
+            onError={handleError}
+            onSuccess={handleSuccess}
+          />
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-brand-border bg-brand-dark py-4 text-center text-xs text-brand-ice/50">
-        GoogleSheet UI Auditor · Multi-language studio for YouTube Shorts spreadsheets
+      <footer className="border-t border-brand-border bg-brand-dark py-4 text-center text-xs text-brand-ice/60 space-y-1">
+        <div>
+          Lingoverse Shorts Studio (GoogleSheet UI Auditor) · Powered by YouTube API Services
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-brand-ice/50">
+          <a
+            href="https://github.com/jlozanopenagos/GoogleSheet_UI_auditor/blob/main/PRIVACY_POLICY.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-sky hover:underline"
+          >
+            Privacy Policy
+          </a>
+          <span>·</span>
+          <a
+            href="https://github.com/jlozanopenagos/GoogleSheet_UI_auditor/blob/main/TERMS_OF_SERVICE.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-sky hover:underline"
+          >
+            Terms of Service
+          </a>
+          <span>·</span>
+          <a
+            href="https://www.youtube.com/t/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-brand-ice hover:underline"
+          >
+            YouTube Terms of Service
+          </a>
+          <span>·</span>
+          <a
+            href="https://policies.google.com/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-brand-ice hover:underline"
+          >
+            Google Privacy Policy
+          </a>
+        </div>
       </footer>
     </div>
   );

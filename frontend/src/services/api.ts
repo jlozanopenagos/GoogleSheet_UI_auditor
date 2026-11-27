@@ -15,6 +15,10 @@ import {
   CalendarPreflightResult,
   CalendarSchedulePayload,
   CalendarScheduleResult,
+  YouTubeAuthStatusData,
+  YouTubePreflightData,
+  YouTubeUploadPayload,
+  YouTubeUploadJob,
   ApiResponse,
 } from '../types';
 
@@ -242,6 +246,88 @@ export async function syncCalendarFromSheets(
   const json: ApiResponse & { detail?: string } = await resp.json();
   if (!resp.ok || !json.success) {
     throw new Error(json.detail || json.message || json.error || 'Failed to sync Launch Calendar from Google Sheets.');
+  }
+  return json.data;
+}
+
+export async function fetchYouTubeAuthStatus(): Promise<YouTubeAuthStatusData> {
+  const resp = await fetch(`${API_BASE}/youtube/auth/status`);
+  const json: ApiResponse<YouTubeAuthStatusData> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to load YouTube auth status.');
+  }
+  return json.data;
+}
+
+export async function startYouTubeOAuth(target: string): Promise<{ auth_url: string; state: string; target: string }> {
+  const resp = await fetch(`${API_BASE}/youtube/auth/start/${encodeURIComponent(target)}`, {
+    method: 'POST',
+  });
+  const json: ApiResponse<{ auth_url: string; state: string; target: string }> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || `Failed to start OAuth for ${target}.`);
+  }
+  return json.data;
+}
+
+export async function disconnectYouTubeTarget(target: string): Promise<void> {
+  const resp = await fetch(`${API_BASE}/youtube/auth/${encodeURIComponent(target)}`, {
+    method: 'DELETE',
+  });
+  const json: ApiResponse & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success) {
+    throw new Error(json.detail || json.message || json.error || `Failed to disconnect ${target}.`);
+  }
+}
+
+export async function fetchYouTubePreflight(scriptId: string): Promise<YouTubePreflightData> {
+  const cleanId = scriptId.trim().toUpperCase();
+  const resp = await fetch(`${API_BASE}/youtube/preflight/${encodeURIComponent(cleanId)}`);
+  const json: ApiResponse<YouTubePreflightData> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || `Failed to load YouTube preflight for ${cleanId}.`);
+  }
+  return json.data;
+}
+
+export async function startYouTubeUpload(payload: YouTubeUploadPayload): Promise<YouTubeUploadJob> {
+  const resp = await fetch(`${API_BASE}/youtube/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...payload,
+      script_id: payload.script_id.trim().toUpperCase(),
+    }),
+  });
+  const json: ApiResponse<YouTubeUploadJob> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to start YouTube upload.');
+  }
+  return json.data;
+}
+
+export async function fetchYouTubeJob(jobId: string): Promise<YouTubeUploadJob> {
+  const resp = await fetch(`${API_BASE}/youtube/jobs/${encodeURIComponent(jobId)}`);
+  const json: ApiResponse<YouTubeUploadJob> & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success || !json.data) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to load upload job status.');
+  }
+  return json.data;
+}
+
+export async function retryYouTubeThumbnail(payload: {
+  script_id: string;
+  video_id: string;
+  thumbnail_file_id: string;
+}): Promise<any> {
+  const resp = await fetch(`${API_BASE}/youtube/retry-thumbnail`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const json: ApiResponse & { detail?: string } = await resp.json();
+  if (!resp.ok || !json.success) {
+    throw new Error(json.detail || json.message || json.error || 'Failed to apply custom thumbnail.');
   }
   return json.data;
 }

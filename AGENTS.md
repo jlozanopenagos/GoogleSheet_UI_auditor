@@ -22,6 +22,9 @@ Instead of manually navigating multiple Google Sheets files in a browser, creato
    - `services/prompt_service.py`: Generates format-specific, high-CTR YouTube Shorts description prompts.
    - `services/title_prompt_service.py`: Generates format-specific, compact thumbnail title prompts (2–7 words, ≤ 45 chars ideal, triad-differentiated, zero emojis/prefixes, rotating creative angles).
    - `services/gemini_service.py`: Manages the Gemini API client, response validation, emoji sanitization, title auditing, and hashtag verification.
+   - `services/youtube_auth_service.py`: Manages per-language Brand Account YouTube OAuth 2.0 and read-only Google Drive OAuth tokens.
+   - `services/drive_asset_service.py`: Navigates `_videos terminados/<lang>/<type>/<ID>/`, streams thumbnail previews, and downloads MP4/thumbnail assets for upload.
+   - `services/youtube_upload_service.py`: Converts `America/Bogota` schedule timestamps to UTC ISO 8601 (`privacyStatus="private"` + `publishAt`), runs resumable `videos.insert`, polls `processingDetails` before `thumbnails.set`, and persists local upload history.
 2. **Open/Closed Principle (OCP)**:
    - Format prompt strategies are decoupled into modular strategies (`ExpressionPromptStrategy`, `GamePromptStrategy`, `RoleplayPromptStrategy`, `FunFactsPromptStrategy`), allowing easy addition of new content types or tuning without touching the orchestration engine.
 3. **Liskov Substitution & Interface Segregation (LSP / ISP)**:
@@ -130,6 +133,12 @@ When the user submits an ID into the search bar:
   - **Triad Day**: Up to `3` shorts per day per language (`1 EXPRESSION + 1 GAME + 1 ROLEPLAY`, flagging format duplicates or mixing Fun Facts unless overridden with `"Force schedule anyway"`).
 - **Persistence & Multi-PC Sync**: Saves launch records to `backend/data/launch_calendar.json` and syncs Column G (`video_ready = TRUE`) + Column H (`video_date = DD/MM/YY`) in Google Sheets via `action: "update_launch"`. `apps_script/Code.gs` applies `.setNumberFormat("@")` on `script_date` / `video_date` writes so Google Sheets preserves `DD/MM/YY` literal text without locale day/month flipping. Once added, the ID card turns **Violet** in Tab 3 (removing it reverts the Bingo card to **Green**). Use the **"Sync from Sheets"** button (`POST /api/calendar/sync`) to pull scheduled rows across all 16 Google Sheet tabs onto any PC.
 
+### Tab 5: "YouTube upload" (Multi-Channel OAuth + Drive Uploader)
+- Connects Google Drive (`drive.readonly`) and each of the 4 language Brand Account channels (`english`, `french`, `spanish`, `italian`) via `backend/credentials/client_secret.json` (tokens stored in `backend/data/youtube_tokens/`).
+- Independent of Tab 4 (reads Tab 4 / Column H launch date only as a read-only date suggestion without mutating Tab 4 or Sheets).
+- Locates `<ID>.mp4` and thumbnail PNGs in `_videos terminados/<lang>/<type>/<ID>/`; requires explicit selection between **LatAm** and **Spain** thumbnails when multiple variants exist.
+- Schedules using `privacyStatus = "private"` + `publishAt` in UTC ISO 8601 (converted from user-entered **America/Bogota, UTC-05:00** hour), waits for `processingStatus == "succeeded"` before calling `thumbnails.set`, and records upload history in `backend/data/youtube_uploads.json`.
+
 ---
 
 ## 6. Gemini SEO Description Engine Rules
@@ -164,11 +173,11 @@ The Gemini system prompts are specialized per video format to follow 2026 YouTub
 | Layer | Location | Purpose & Scope |
 | :--- | :--- | :--- |
 | **Static Analysis** | `pyproject.toml` (`ruff`) + `tsc` | Catches undefined names, unused imports, lint errors, and TypeScript regressions before runtime. |
-| **Backend Unit** | `tests/unit/` | Fast pure-logic & service tests (`routing`, `prompt_service`, `gemini_auditor`, `gemini_service`, `script_doctor_service`, `calendar_service`, `sheet_service`). |
-| **Backend API** | `tests/api/` | FastAPI `TestClient` router contracts (`sheets`, `gemini`, `calendar`), HTTP status codes (`400`/`404`/`502`), and validation rules. |
+| **Backend Unit** | `tests/unit/` | Fast pure-logic & service tests (`routing`, `prompt_service`, `title_prompt_service`, `gemini_auditor`, `gemini_service`, `script_doctor_service`, `calendar_service`, `sheet_service`, `youtube_auth_service`, `drive_asset_service`, `youtube_upload_service`). |
+| **Backend API** | `tests/api/` | FastAPI `TestClient` router contracts (`sheets`, `gemini`, `calendar`, `youtube`), HTTP status codes (`400`/`404`/`502`), and validation rules. |
 | **Backend Integration** | `tests/integration/` | Cross-service lifecycles (`Schedule -> Violet Bingo -> Move -> Unschedule -> Green Bingo -> Sync from Sheets`). |
 | **Apps Script Contract** | `tests/contract/` | Verifies `apps_script/Code.gs` handles all backend `doPost` actions, returns `updated_fields`, and enforces `.setNumberFormat("@")` on date cells. |
-| **Frontend Tests** | `frontend/src/__tests__/` | `vitest` + `@testing-library/react` tests for `services/api.ts`, `ScriptAuditorView.tsx`, `DescriptionCreationView.tsx`, `IdChecklistView.tsx`, and `LaunchCalendarView.tsx`. |
+| **Frontend Tests** | `frontend/src/__tests__/` | `vitest` + `@testing-library/react` tests for `services/api.ts`, `ScriptAuditorView.tsx`, `DescriptionCreationView.tsx`, `IdChecklistView.tsx`, `LaunchCalendarView.tsx`, and `YouTubeUploadView.tsx`. |
 
 - **Global Isolation Guardrails (`tests/conftest.py`)**: An `autouse` fixture isolates `CalendarService` to a per-test temp JSON file (protecting live `backend/data/launch_calendar.json`) and blocks accidental real outbound HTTP requests via `requests.Session.request` unless explicitly running `--live-smoke`.
 - **Unified Runner (`tests/run_tests.py`)**: Run `--layer {unit,api,integration,contract,all}`, `--check-static`, `--coverage`, or opt-in `--live-smoke` (harmless `ZZ999` probe verifying live Apps Script deployment).

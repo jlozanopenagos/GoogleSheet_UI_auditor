@@ -5,6 +5,9 @@ import {
   generateGeminiTitle,
   scheduleCalendarId,
   syncCalendarFromSheets,
+  fetchYouTubeAuthStatus,
+  fetchYouTubePreflight,
+  startYouTubeUpload,
 } from '../services/api';
 
 describe('API service client', () => {
@@ -163,5 +166,49 @@ describe('API service client', () => {
     await expect(
       generateGeminiTitle({ script_id: 'EE01', expression: 'Break a leg', script_changed: '' })
     ).rejects.toThrow('Column D is empty');
+  });
+
+  it('YouTube API helpers call auth/status, preflight, and upload endpoints', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'OK',
+        data: { client_secret_configured: true, client_secret_path: 'x', targets: {} },
+      }),
+    });
+    const auth = await fetchYouTubeAuthStatus();
+    expect(fetchMock).toHaveBeenCalledWith('/api/youtube/auth/status');
+    expect(auth.client_secret_configured).toBe(true);
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'OK',
+        data: { record: { ID: 'se08' }, suggested_launch_date: '2026-12-15' },
+      }),
+    });
+    const pre = await fetchYouTubePreflight(' se08 ');
+    expect(fetchMock).toHaveBeenCalledWith('/api/youtube/preflight/SE08');
+    expect(pre.suggested_launch_date).toBe('2026-12-15');
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        message: 'Started',
+        data: { job_id: 'job-1', stage: 'queued', progress_pct: 0 },
+      }),
+    });
+    const job = await startYouTubeUpload({
+      script_id: 'se08',
+      thumbnail_file_id: 't1',
+      visibility_mode: 'scheduled',
+      scheduled_date: '2026-12-15',
+      scheduled_time: '14:00',
+      timezone_name: 'America/Bogota',
+    });
+    expect(job.job_id).toBe('job-1');
   });
 });

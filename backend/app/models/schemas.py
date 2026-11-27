@@ -151,6 +151,45 @@ class BatchUpdateReadyRequest(BaseModel):
     updates: List[BatchUpdateReadyItem]
 
 
+class YouTubeTargetStatus(BaseModel):
+    target: str
+    connected: bool = False
+    channel_id: str = ""
+    channel_title: str = ""
+    channel_thumbnail: str = ""
+    account_email: str = ""
+    connected_at: str = ""
+    has_playlist_scope: bool = False
+
+
+class DriveAssetItem(BaseModel):
+    file_id: str
+    name: str
+    mime_type: str = ""
+    size_bytes: int = 0
+    variant: str = ""
+    preview_url: str = ""
+
+
+class YouTubeUploadRequest(BaseModel):
+    script_id: str = Field(..., description="Canonical ID (e.g. EE01, SE08)")
+    thumbnail_file_id: str = Field("", description="Selected Google Drive thumbnail file ID")
+    playlist_id: str = Field("", description="Optional YouTube Playlist ID")
+    playlist_title: str = Field("", description="Optional YouTube Playlist title")
+    visibility_mode: str = Field("scheduled", description="scheduled | public | private")
+    scheduled_date: str = Field("", description="YYYY-MM-DD in target timezone")
+    scheduled_time: str = Field("", description="HH:MM (24h) in target timezone")
+    timezone_name: str = Field("America/Bogota", description="IANA timezone (default America/Bogota)")
+    title_override: Optional[str] = None
+    description_override: Optional[str] = None
+
+
+class YouTubeRetryThumbnailRequest(BaseModel):
+    script_id: str = Field(..., description="Canonical ID (e.g. SE08)")
+    video_id: str = Field(..., description="YouTube Video ID")
+    thumbnail_file_id: str = Field(..., description="Google Drive thumbnail file ID")
+
+
 class ApiResponse(BaseModel):
     success: bool
     message: str = ""

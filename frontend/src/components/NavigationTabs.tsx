@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileEdit, Sparkles, LayoutGrid, Calendar } from 'lucide-react';
+import { FileEdit, Sparkles, LayoutGrid, Calendar, Upload } from 'lucide-react';
 import { ActiveTab } from '../types';
 
 export interface NavTabItem {
@@ -28,6 +28,11 @@ const TABS: NavTabItem[] = [
     id: 'launch_calendar',
     label: 'Launch calendar',
     icon: Calendar,
+  },
+  {
+    id: 'youtube_upload',
+    label: 'YouTube upload',
+    icon: Upload,
   },
 ];
 

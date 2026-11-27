@@ -48,6 +48,14 @@ class Settings(BaseModel):
     request_timeout: int = 35
     max_retries: int = 3
 
+    # YouTube Data API v3 & Google Drive OAuth / Asset settings
+    youtube_client_secret_path: str = os.getenv("YOUTUBE_CLIENT_SECRET_PATH", "backend/credentials/client_secret.json")
+    youtube_oauth_redirect_uri: str = os.getenv("YOUTUBE_OAUTH_REDIRECT_URI", "")
+    google_drive_root_folder_id: str = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID", "")
+    google_drive_root_folder_name: str = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_NAME", "_videos terminados")
+    youtube_default_category_id: str = os.getenv("YOUTUBE_DEFAULT_CATEGORY_ID", "27")
+    youtube_default_timezone: str = os.getenv("YOUTUBE_DEFAULT_TIMEZONE", "America/Bogota")
+
 
 settings = Settings()
 

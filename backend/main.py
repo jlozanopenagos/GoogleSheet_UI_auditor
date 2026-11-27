@@ -21,6 +21,8 @@ from app.routers.sheets import router as sheets_router
 from app.routers.gemini import router as gemini_router
 # pyrefly: ignore[missing-import]
 from app.routers.calendar import router as calendar_router
+# pyrefly: ignore[missing-import]
+from app.routers.youtube import router as youtube_router
 
 app = FastAPI(
     title="GoogleSheet UI Auditor API",
@@ -41,6 +43,7 @@ app.add_middleware(
 app.include_router(sheets_router)
 app.include_router(gemini_router)
 app.include_router(calendar_router)
+app.include_router(youtube_router)
 
 
 @app.get("/api/health")
